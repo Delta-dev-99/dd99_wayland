@@ -1,7 +1,7 @@
 
 find_package(pugixml REQUIRED)
 
-set(target_name scanner)
+set(target_name dd99_wayland_scanner)
 add_executable(${target_name})
 set_target_warnings(${target_name} PRIVATE)
 target_compile_features(${target_name} PUBLIC cxx_std_23)
