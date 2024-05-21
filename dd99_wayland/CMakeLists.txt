@@ -7,5 +7,5 @@ set_target_warnings(${target_name} PRIVATE)
 target_compile_features(${target_name} PUBLIC cxx_std_20)
 target_include_directories(${target_name} PUBLIC include)
 target_sources(${target_name} PRIVATE
-    src/thin_wayland_client.cpp
+    src/engine.cpp
 )
