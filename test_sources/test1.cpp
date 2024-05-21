@@ -1,12 +1,16 @@
 #include <dd99/wayland/wayland_client.hpp>
-#include <span>
-
+#include "dd99-wayland-client-protocol-wayland.hpp"
 
 
 int main()
 {
 
-    dd99::wayland::display disp
+    struct wnd
+    {
+        void event() {}
+    } mywnd;
+
+    dd99::wayland::engine disp
     {
         [](std::span<unsigned char>, std::span<int>)
         {
@@ -14,6 +18,5 @@ int main()
         }
     };
 
-    
-
+    dd99::wayland::engine wl{[&](std::span<unsigned char>, std::span<int>){mywnd.event();}};
 }
