@@ -381,7 +381,7 @@ struct scan_args
                         print_help = true;
                         write_format(STDIN_FILENO, "Error: Whitespace not allowed after option with value: \"{}\"", v);
                     }
-                    main_include{v.substr(13)};
+                    main_include = v.substr(13);
                 }
                 else
                 {
@@ -461,6 +461,11 @@ int main(int argc, char ** argv)
     if (args.print_help) print_help(args);
     if (args.print_help || args.print_version) return 0;
 
+    write_format(STDOUT_FILENO, "Generating header \"{}\" and source \"{}\" from protocols:", args.hdr_file_path, args.src_file_path);
+    if (args.xml_file_paths.size() == 1) write_format(STDOUT_FILENO, " {}", args.xml_file_paths.front());
+    else for (const auto x : args.xml_file_paths) write_format(STDOUT_FILENO, "\n  - {}", x);
+    ::write(STDOUT_FILENO, "\n", 1);
+
     // the collection of protocols parsed from all input xml files
     std::deque<pugi::xml_document> docs; // these own the memory most string_views point to
     std::deque<protocol_t> protocols;
@@ -509,7 +514,7 @@ int main(int argc, char ** argv)
 
         auto main_include = args.main_include;
         if (main_include.empty()) main_include = (args.side == scan_args::side_t::CLIENT)
-            ? "<dd99/wayland/client.hpp>" : "<dd99/wayland/server.hpp>";
+            ? "<dd99/wayland/wayland_client.hpp>" : "<dd99/wayland/wayland_server.hpp>";
 
         // header guard and default includes
         write_format(hdr_fd, ""
