@@ -1,0 +1,21 @@
+find_path(LIBURING_INCLUDE_DIR NAMES liburing.h)
+mark_as_advanced(LIBURING_INCLUDE_DIR)
+
+find_library(LIBURING_LIBRARY NAMES uring)
+mark_as_advanced(LIBURING_LIBRARY)
+
+include(FindPackageHandleStandardArgs)
+FIND_PACKAGE_HANDLE_STANDARD_ARGS(LibUring REQUIRED_VARS LIBURING_LIBRARY LIBURING_INCLUDE_DIR)
+
+if(LibUring_FOUND)
+    set(LIBURING_LIBRARIES ${LIBURING_LIBRARY})
+    set(LIBURING_INCLUDE_DIRS ${LIBURING_INCLUDE_DIR})
+
+    add_library(LibUring STATIC IMPORTED)
+    set_target_properties(LibUring PROPERTIES
+        IMPORTED_LOCATION ${LIBURING_LIBRARIES}
+        INTERFACE_INCLUDE_DIRECTORIES ${LIBURING_INCLUDE_DIR}
+    )
+
+    add_library(LibUring::LibUring ALIAS LibUring)
+endif()
