@@ -361,7 +361,7 @@ struct event_t : public element_t
   }
 };
 
-struct request_t : public event_t
+struct message_t : public event_t
 {
 };
 
@@ -469,16 +469,16 @@ struct interface_t : public element_t
   int version = 0;
   std::string orig_name;
   int destroy_opcode = 0;
-  std::list<request_t> requests;
-  std::list<event_t> events;
-  std::list<enumeration_t> enums;
+  std::list<message_t> client_to_server;
+  std::list<event_t> server_to_client_msg_collection;
+  std::list<enumeration_t> enum_collection;
   std::list<post_error_t> errors;
 
   std::string print_forward() const
   {
     std::stringstream ss;
     ss << "class " << name << "_t;" << std::endl;
-    for(auto const& e : enums)
+    for(auto const& e : enum_collection)
       ss << e.print_forward(name);
     return ss.str();
   }
@@ -503,7 +503,7 @@ struct interface_t : public element_t
        << "  struct events_t : public detail::events_base_t" << std::endl
        << "  {" << std::endl;
 
-    for(auto const& event : events)
+    for(auto const& event : server_to_client_msg_collection)
       ss << event.print_functional(false) << std::endl;
 
     ss << "  };" << std::endl
@@ -525,17 +525,17 @@ struct interface_t : public element_t
        << "  operator " << orig_name << "*() const;" << std::endl
        << std::endl;
 
-    for(auto const& request : requests)
+    for(auto const& request : client_to_server)
       if(request.name != "destroy")
         ss << request.print_header(false) << std::endl;
 
-    for(auto const& event : events)
+    for(auto const& event : server_to_client_msg_collection)
       ss << event.print_signal_header(false) << std::endl;
 
     ss << "};" << std::endl
        << std::endl;
 
-    for(auto const& enumeration : enums)
+    for(auto const& enumeration : enum_collection)
       ss << enumeration.print_header(name) << std::endl;
 
     return ss.str();
@@ -554,7 +554,7 @@ struct interface_t : public element_t
        << "  struct events_t : public resource_t::events_base_t" << std::endl
        << "  {" << std::endl;
 
-    for(auto const& request : requests)
+    for(auto const& request : client_to_server)
       ss << request.print_functional(true) << std::endl;
 
     ss << "  };" << std::endl
@@ -580,10 +580,10 @@ struct interface_t : public element_t
        << "  operator " << orig_name << "*() const;" << std::endl
        << std::endl;
 
-    for(auto const& request : requests)
+    for(auto const& request : client_to_server)
       ss << request.print_signal_header(true) << std::endl;
 
-    for(auto const& event : events)
+    for(auto const& event : server_to_client_msg_collection)
       ss << event.print_header(true) << std::endl;
 
     for(auto const& error : errors)
@@ -594,7 +594,7 @@ struct interface_t : public element_t
        << "using global_" << name << "_t = global_t<" << name << "_t>;" << std::endl
        << std::endl;
 
-    for(auto const& enumeration : enums)
+    for(auto const& enumeration : enum_collection)
       ss << enumeration.print_header(name) << std::endl;
 
     return ss.str();
@@ -661,25 +661,25 @@ struct interface_t : public element_t
        << "}" << std::endl
        << std::endl;
 
-    for(auto const& request : requests)
+    for(auto const& request : client_to_server)
       if(request.name != "destroy")
         ss << request.print_body(name, false) << std::endl
            << std::endl;
 
-    for(auto const& event : events)
+    for(auto const& event : server_to_client_msg_collection)
       ss << event.print_signal_body(name, false) << std::endl;
 
     ss << "int " << name << "_t::dispatcher(uint32_t opcode, const std::vector<any>& args, const std::shared_ptr<detail::events_base_t>& e)" << std::endl
        << "{" << std::endl;
 
-    if(!events.empty())
+    if(!server_to_client_msg_collection.empty())
     {
       ss << "  std::shared_ptr<events_t> events = std::static_pointer_cast<events_t>(e);" << std::endl
          << "  switch(opcode)" << std::endl
          << "    {" << std::endl;
 
       int opcode = 0;
-      for(auto const& event : events)
+      for(auto const& event : server_to_client_msg_collection)
         ss << event.print_dispatcher(opcode++, false) << std::endl;
 
       ss << "    }" << std::endl;
@@ -688,7 +688,7 @@ struct interface_t : public element_t
     ss << "  return 0;" << std::endl
        << "}" << std::endl;
 
-    for(auto const& enumeration : enums)
+    for(auto const& enumeration : enum_collection)
       ss << enumeration.print_body(name) << std::endl;
 
     return ss.str();
@@ -717,11 +717,11 @@ struct interface_t : public element_t
        << "}" << std::endl
        << std::endl;
 
-    for(auto const& request : requests)
+    for(auto const& request : client_to_server)
       ss << request.print_signal_body(name, true) << std::endl
          << std::endl;
 
-    for(auto const& event : events)
+    for(auto const& event : server_to_client_msg_collection)
       ss << event.print_body(name, true) << std::endl;
 
     for(auto const& error : errors)
@@ -730,14 +730,14 @@ struct interface_t : public element_t
     ss << "int " << name << "_t::dispatcher(int opcode, const std::vector<any>& args, const std::shared_ptr<resource_t::events_base_t>& e)" << std::endl
        << "{" << std::endl;
 
-    if(!requests.empty())
+    if(!client_to_server.empty())
     {
       ss << "  std::shared_ptr<events_t> events = std::static_pointer_cast<events_t>(e);" << std::endl
          << "  switch(opcode)" << std::endl
          << "    {" << std::endl;
 
       int opcode = 0;
-      for(auto const& request : requests)
+      for(auto const& request : client_to_server)
         ss << request.print_dispatcher(opcode++, true) << std::endl;
 
       ss << "    }" << std::endl;
@@ -746,7 +746,7 @@ struct interface_t : public element_t
     ss << "  return 0;" << std::endl
        << "}" << std::endl;
 
-    for(auto const& enumeration : enums)
+    for(auto const& enumeration : enum_collection)
       ss << enumeration.print_body(name) << std::endl;
 
     return ss.str();
@@ -755,7 +755,7 @@ struct interface_t : public element_t
   std::string print_interface_body(bool server) const
   {
     std::stringstream ss;
-    for(auto const& request : requests)
+    for(auto const& request : client_to_server)
     {
       ss << "const wl_interface* " << name << "_interface_" << request.name << "_request" << (server ? "_server" : "") << "[" << request.args.size() << "] = {" << std::endl;
       for(auto const& arg : request.args)
@@ -766,7 +766,7 @@ struct interface_t : public element_t
       ss << "};" << std::endl
          << std::endl;
     }
-    for(auto const& event : events)
+    for(auto const& event : server_to_client_msg_collection)
     {
       ss << "const wl_interface* " << name << "_interface_" << event.name << "_event" << (server ? "_server" : "") << "[" << event.args.size() << "] = {" << std::endl;
       for(auto const& arg : event.args)
@@ -777,8 +777,8 @@ struct interface_t : public element_t
       ss << "};" << std::endl
          << std::endl;
     }
-    ss << "const wl_message " << name << "_interface_requests" << (server ? "_server" : "") << "[" << requests.size() << "] = {" << std::endl;
-    for(auto const& request : requests)
+    ss << "const wl_message " << name << "_interface_requests" << (server ? "_server" : "") << "[" << client_to_server.size() << "] = {" << std::endl;
+    for(auto const& request : client_to_server)
     {
       ss << "  {" << std::endl
          << "    \"" << request.name << "\"," << std::endl
@@ -799,8 +799,8 @@ struct interface_t : public element_t
     }
     ss << "};" << std::endl
        << std::endl;
-    ss << "const wl_message " << name << "_interface_events" << (server ? "_server" : "") << "[" << events.size() << "] = {" << std::endl;
-    for(auto const& event : events)
+    ss << "const wl_message " << name << "_interface_events" << (server ? "_server" : "") << "[" << server_to_client_msg_collection.size() << "] = {" << std::endl;
+    for(auto const& event : server_to_client_msg_collection)
     {
       ss << "  {" << std::endl
          << "    \"" << event.name << "\"," << std::endl
@@ -828,9 +828,9 @@ struct interface_t : public element_t
     ss << "  {" << std::endl
        << "    \"" << orig_name << "\"," << std::endl
        << "    " << version << "," << std::endl
-       << "    " << requests.size() << "," << std::endl
+       << "    " << client_to_server.size() << "," << std::endl
        << "    " << name << "_interface_requests" << (server ? "_server" : "") << "," << std::endl
-       << "    " << events.size() << "," << std::endl
+       << "    " << server_to_client_msg_collection.size() << "," << std::endl
        << "    " << name << "_interface_events" << (server ? "_server" : "") << "," << std::endl
        << "  };" << std::endl
        << std::endl;
@@ -933,7 +933,7 @@ int main(int argc, char *argv[])
       int opcode = 0; // Opcodes are in order of the XML. (Sadly undocumented)
       for(auto const& request : interface.children("request"))
       {
-        request_t req;
+        message_t req;
         req.opcode = opcode++;
         req.name = request.attribute("name").value();
 
@@ -985,7 +985,7 @@ int main(int argc, char *argv[])
             req.ret = arg;
           req.args.push_back(arg);
         }
-        iface.requests.push_back(req);
+        iface.client_to_server.push_back(req);
       }
 
       opcode = 0;
@@ -1040,7 +1040,7 @@ int main(int argc, char *argv[])
             ev.ret = arg;
           ev.args.push_back(arg);
         }
-        iface.events.push_back(ev);
+        iface.server_to_client_msg_collection.push_back(ev);
       }
 
       for(auto const& enumeration : interface.children("enum"))
@@ -1092,7 +1092,7 @@ int main(int argc, char *argv[])
             iface.errors.push_back(error);
           }
         }
-        iface.enums.push_back(enu);
+        iface.enum_collection.push_back(enu);
       }
 
       interfaces.push_back(iface);

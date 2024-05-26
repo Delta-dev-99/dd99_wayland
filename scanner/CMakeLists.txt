@@ -7,7 +7,7 @@ set_target_warnings(${target_name} PRIVATE)
 target_compile_features(${target_name} PUBLIC cxx_std_23)
 target_include_directories(${target_name} PUBLIC include)
 target_sources(${target_name} PRIVATE
-    scanner.cpp
+    src/scanner.cpp
 )
 target_link_libraries(${target_name} PRIVATE pugixml::pugixml)
 
@@ -33,8 +33,9 @@ function(dd99_add_wayland_client_protocol target_or_sources_var)
     set_property(SOURCE ${_client_header} ${_code} PROPERTY SKIP_AUTOMOC ON)
 
     add_custom_command(OUTPUT "${_client_header}" "${_code}"
+        COMMENT "[dd99_wayland_scanner] generating files for ${_infile}"
         COMMAND dd99_wayland_scanner ${_infile} ${_client_header} ${_code}
-        DEPENDS ${_infile} VERBATIM)
+        DEPENDS ${_infile} dd99_wayland_scanner VERBATIM)
 
     if (TARGET ${target_or_sources_var})
         target_sources(${target_or_sources_var} PRIVATE "${_client_header}" "${_code}")
