@@ -36,31 +36,33 @@
 namespace dd99::wayland
 {
 
+    
+
     namespace detail
     {
 
-        struct message
-        {
-            std::string_view name;
-            std::string_view signature;
-        };
+        // struct message
+        // {
+        //     std::string_view name;
+        //     std::string_view signature;
+        // };
 
-        struct interface
-        {
-            std::string name;
-            int version;
-            std::vector<message> methods;
-            std::vector<message> events;
-        };
+        // struct interface
+        // {
+        //     std::string name;
+        //     int version;
+        //     std::vector<message> methods;
+        //     std::vector<message> events;
+        // };
 
 
 
-        struct protocol_error
-        {
-            uint32_t code;
-            // interface
-            // object id
-        };
+        // struct protocol_error
+        // {
+        //     uint32_t code;
+        //     // interface
+        //     // object id
+        // };
 
     }
 
