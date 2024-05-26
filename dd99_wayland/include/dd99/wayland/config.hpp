@@ -2,17 +2,29 @@
 
 
 #if defined(__cplusplus)
-    #define TWC_EXPORT [[gnu::visibility("default")]]
+    #define DD99_WAYLAND_EXPORT [[gnu::visibility("default")]]
+    #define DD99_WAYLAND_HIDDEN [[gnu::visibility("hidden")]]
+    #define DD99_WAYLAND_DEPRECATED [[deprecated]]
 #elif defined(__GNUC__) && __GNUC__ >= 4
-    #define TWC_EXPORT __attribute__((visibility("default")))
+    #define DD99_WAYLAND_EXPORT __attribute__((visibility("default")))
+    #define DD99_WAYLAND_HIDDEN __attribute__((visibility("hidden")))
+    #define DD99_WAYLAND_DEPRECATED __attribute__((deprecated))
 #else
-    #define TWC_EXPORT
+    #define DD99_WAYLAND_EXPORT
+    #define DD99_WAYLAND_HIDDEN
+    #define DD99_WAYLAND_DEPRECATED
 #endif
 
 #if defined(__cplusplus)
-    #define TWC_EXPORT [[deprecated]]
-#elif defined(__GNUC__) && __GNUC__ >= 4
-    #define TWC_EXPORT __attribute__((deprecated))
+namespace dd99::wayland
+{
+    consteval auto is_debug_enabled()
+    {
+#if not defined(NDEBUG) or defined(DD99_WAYLAND_DEBUG)
+        return true;
 #else
-    #define TWC_EXPORT
+        return false;
+#endif
+    }
+}
 #endif
