@@ -1,14 +1,17 @@
 #include <bits/types/struct_iovec.h>
+#include <chrono>
 #include <cstdlib>
 #include <filesystem>
 #include <dd99/wayland/wayland_client.hpp>
 #include <stdexcept>
 #include <asio.hpp>
+#include <thread>
 #include <vector>
 #include "asio/buffer.hpp"
 #include "asio/connect.hpp"
 #include "asio/io_context.hpp"
 #include "asio/local/stream_protocol.hpp"
+#include "asio/write.hpp"
 #include "dd99-wayland-client-protocol-wayland.hpp"
 
 
@@ -16,18 +19,11 @@ int main()
 {
     asio::io_context io_ctx;
 
-    struct wnd
-    {
-        void event() {}
-    } mywnd;
-
-    dd99::wayland::engine disp
-    {
-        [](std::span<unsigned char>, std::span<int>)
-        {
-
-        }
-    };
+    // struct wnd
+    // {
+    //     void event() {}
+    // } mywnd;
+    // dd99::wayland::engine wl{[&](std::span<unsigned char>, std::span<int>){mywnd.event();}};
 
 
     auto wayland_path = []()->std::filesystem::path {
@@ -46,18 +42,28 @@ int main()
         return runtime_dir/wayland_display;
     }();
 
-    dd99::wayland::engine wl{[&](std::span<unsigned char>, std::span<int>){mywnd.event();}};
-
-
-
     asio::local::stream_protocol::socket sock{io_ctx};
     sock.connect(asio::local::stream_protocol::endpoint{wayland_path});
+
+    // connected!
+
+    dd99::wayland::engine wl_eng
+    {
+        [&](std::span<unsigned char> data, std::span<int>)
+        {
+            asio::write(sock, asio::buffer(data));
+        }
+    };
+
+
+
 
     std::vector<char> buf;
     buf.reserve(2048);
     for (;;) {
-        auto n = sock.read_some(asio::buffer(buf));
-        iovec vec{buf.data(), buf.size()};
-        wl.process_input(&vec, 1);
+        auto n [[maybe_unused]] = sock.read_some(asio::buffer(buf));
+        auto n_consumed = wl_eng.process_input(buf);
+        buf.erase(buf.begin(), buf.begin() + n_consumed);
+        std::this_thread::sleep_for(std::chrono::microseconds{20});
     }
 }
