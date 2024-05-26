@@ -1,8 +1,5 @@
 #pragma once
 
-#include <bits/types/struct_iovec.h>
-#include <sys/types.h>
-
 #include <concepts>
 #include <memory>
 #include <span>
@@ -13,12 +10,14 @@
 
 namespace dd99::wayland
 {
-    namespace proto{ struct interface; }
-
-    namespace detail
-    {
-        struct engine_impl;
+    namespace proto{
+        struct interface;
+        namespace wayland{
+            struct display;
+        }
     }
+
+    namespace detail { struct engine_impl; }
 
 
 
@@ -61,6 +60,11 @@ namespace dd99::wayland
         engine(engine&&) = default; // default move
 
     
+    public:
+        // get a reference of the root object of the protocol: the wayland display
+        dd99::wayland::proto::wayland::display & get_display();
+
+    
     public: // I/O API
     
         // The user is expected to manually read data from the wayland server connection and handle buffering.
@@ -74,7 +78,8 @@ namespace dd99::wayland
         // This function takes `iovec` (scatter/gather style) input to allow efficient implementations using ringbuffers.
         // 
         // @RETURN: bytes consumed
-        std::size_t process_input(iovec * data, std::size_t iovec_count);
+        // std::size_t process_input(iovec * data, std::size_t iovec_count);
+        std::size_t process_input(std::span<char> data);
 
         // The user is expected to manually write data to the wayland server connection.
         // When there is data to be sent to the wayland server, this callback gets called.
@@ -101,6 +106,7 @@ namespace dd99::wayland
         template <class Interface> std::pair<object_id_t, Interface> create_interface();
         void destroy_iterface(const proto::interface & x); // called by interface destructors
 
+        // accessor for protocol-defined interfaces
         struct engine_accessor
         {
             engine & m_engine;

@@ -31,7 +31,7 @@ namespace dd99::wayland
             using message_size_t = engine<>::message_length_t;
             
             static constexpr object_id_t client_object_id_base = 1;
-            static constexpr object_id_t server_object_id_base = 0xf0000000;
+            static constexpr object_id_t server_object_id_base = 0xFF000000;
 
 
             engine_impl(engine_cb_t _cb, void * _user_data)
@@ -41,7 +41,10 @@ namespace dd99::wayland
 
 
 
-            std::size_t process_input(iovec * data, std::size_t iovec_count);
+            // std::size_t process_input(iovec * data, std::size_t iovec_count);
+            std::size_t process_input(std::span<char> data);
+
+            dd99::wayland::proto::wayland::display & get_display();
 
 
 
@@ -68,10 +71,13 @@ namespace dd99::wayland
         impl->user_data = user_data;
     }
 
-    std::size_t engine<engine_cb_t>::process_input(iovec * data, std::size_t iovec_count)
-    {
-        return impl->process_input(data, iovec_count);
-    }
+    // std::size_t engine<engine_cb_t>::process_input(iovec * data, std::size_t iovec_count)
+    // {
+    //     return impl->process_input(data, iovec_count);
+    // }
+    std::size_t engine<engine_cb_t>::process_input(std::span<char> data) { return impl->process_input(data); }
+
+    proto::wayland::display & engine<engine_cb_t>::get_display() { return impl->get_display(); }
 
 
 
@@ -79,67 +85,100 @@ namespace dd99::wayland
 
     namespace detail
     {
-        std::size_t engine_impl::process_input(iovec * data, std::size_t iovec_count)
+        std::size_t engine_impl::process_input(std::span<char> data)
         {
-            if (iovec_count == 0) return 0;
-
-            const std::size_t total_data = std::accumulate(data, data + iovec_count, std::size_t{}, 
-                [](std::size_t && acc, iovec & v){ return std::move(acc) + v.iov_len; });
-
             std::size_t consumed = 0;
-            // std::size_t current_buf = 0;
-            // std::size_t buf_pos = 0;
 
-            auto extract_data = [&]<class T>() -> const T &
+            // process one message per cycle
+            // stop when there's not enough data to complete a message
+            for(;;)
             {
-                const auto available_contiguous_data = data[current_buf].iov_len - buf_pos;
-                const auto data_ptr = static_cast<const char *>(data[current_buf].iov_base) + buf_pos;
-                // check data element is contiguous in buffer and meets alignment requirements
-                if ((available_contiguous_data >= sizeof(T)) &&
-                    (reinterpret_cast<std::uintptr_t>(data_ptr) & (alignof(T) - 1) == 0))
-                {
-                    return *static_cast<const T *>(data_ptr);
-                }
-                else
-                {
-                    alignas(T) char elem_data[sizeof(T)];
-                    auto remaining = sizeof(T);
-                    std::copy_n(data_ptr, std::min(data[current_buf].iov_len - buf_pos, remaining), elem_data);
-                }
-            };
-
-            // // *** TODO: do this the right way
-            // static std::vector<char> buffer;
-            // std::size_t sz = 0;
-            // for (std::size_t i = 0; i < iovec_count; ++i) sz += data[i].iov_len;
-            // buffer.clear();
-            // buffer.reserve(sz);
-            // if (buffer.capacity() < sz) buffer.resize(sz); // just to be sure
-            // for (std::size_t i = 0; i < iovec_count; ++i)
-            //     std::copy(reinterpret_cast<char *>(data[i].iov_base)
-            //             , reinterpret_cast<char *>(data[i].iov_base) + data[i].iov_len
-            //             , std::back_inserter(buffer));
-
-            for (;;)
-            {
-                const auto available_data = total_data - consumed;
-
+                const auto available_data = data.size() - consumed;
                 constexpr auto hdr_size = sizeof(object_id_t) + sizeof(message_size_t);
+
                 if (available_data < hdr_size) break;
 
-                const object_id_t & msg_obj_id = * reinterpret_cast<object_id_t *>(buffer.data() + consumed);
-                message_size_t & msg_size = * reinterpret_cast<message_size_t *>(buffer.data() + consumed + sizeof(msg_obj_id));
-
+                object_id_t msg_obj_id = *reinterpret_cast<std::uint32_t *>(data.data());
+                message_size_t msg_size = static_cast<std::uint16_t>((*(reinterpret_cast<std::uint32_t *>(data.data()) + 1)) >> 16);
+                
                 if (available_data < msg_size) break;
-
                 consumed += msg_size;
+                
+                m_client_object_map[msg_obj_id]->parse_and_dispatch_event(data);
 
-                // auto x = m_client_object_map[msg_obj_id]->parse_and_dispatch_event()
-                // get_object().parse_and_dispatch_event(buffer.data() + consumed);
+                data = data.subspan(msg_size);
             }
 
             return consumed;
         }
+
+
+        // std::size_t engine_impl::process_input(iovec * data, std::size_t iovec_count)
+        // {
+        //     if (iovec_count == 0) return 0;
+
+        //     const std::size_t total_data = std::accumulate(data, data + iovec_count, std::size_t{}, 
+        //         [](std::size_t && acc, iovec & v){ return std::move(acc) + v.iov_len; });
+
+        //     std::size_t consumed = 0;
+
+        //     auto current_buf = data;
+        //     const auto end_buf = data + iovec_count;
+        //     std::size_t current_buf_pos = 0;
+        //     std::size_t current_buf_size = 
+
+        //     // auto extract_data = [&]<class T>() -> const T &
+        //     // {
+        //     //     const auto available_contiguous_data = data[current_buf].iov_len - buf_pos;
+        //     //     const auto data_ptr = static_cast<const char *>(data[current_buf].iov_base) + buf_pos;
+        //     //     // check data element is contiguous in buffer and meets alignment requirements
+        //     //     if ((available_contiguous_data >= sizeof(T)) &&
+        //     //         (reinterpret_cast<std::uintptr_t>(data_ptr) & (alignof(T) - 1) == 0))
+        //     //     {
+        //     //         return *static_cast<const T *>(data_ptr);
+        //     //     }
+        //     //     else
+        //     //     {
+        //     //         alignas(T) char elem_data[sizeof(T)];
+        //     //         auto remaining = sizeof(T);
+        //     //         std::copy_n(data_ptr, std::min(data[current_buf].iov_len - buf_pos, remaining), elem_data);
+        //     //     }
+        //     // };
+
+        //     // // *** TODO: do this the right way
+        //     // static std::vector<char> buffer;
+        //     // std::size_t sz = 0;
+        //     // for (std::size_t i = 0; i < iovec_count; ++i) sz += data[i].iov_len;
+        //     // buffer.clear();
+        //     // buffer.reserve(sz);
+        //     // if (buffer.capacity() < sz) buffer.resize(sz); // just to be sure
+        //     // for (std::size_t i = 0; i < iovec_count; ++i)
+        //     //     std::copy(reinterpret_cast<char *>(data[i].iov_base)
+        //     //             , reinterpret_cast<char *>(data[i].iov_base) + data[i].iov_len
+        //     //             , std::back_inserter(buffer));
+
+        //     // process one message per cycle
+        //     // stop when there's not enough data to complete a message
+        //     for (;;)
+        //     {
+        //         const auto available_data = total_data - consumed;
+
+        //         constexpr auto hdr_size = sizeof(object_id_t) + sizeof(message_size_t);
+        //         if (available_data < hdr_size) break;
+
+        //         const object_id_t msg_obj_id = * reinterpret_cast<object_id_t *>(buffer.data() + consumed);
+        //         message_size_t msg_size = * reinterpret_cast<message_size_t *>(buffer.data() + consumed + sizeof(msg_obj_id));
+
+        //         if (available_data < msg_size) break;
+
+        //         consumed += msg_size;
+
+        //         // auto x = m_client_object_map[msg_obj_id]->parse_and_dispatch_event()
+        //         // get_object().parse_and_dispatch_event(buffer.data() + consumed);
+        //     }
+
+        //     return consumed;
+        // }
     }
 
 }

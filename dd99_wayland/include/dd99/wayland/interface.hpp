@@ -32,7 +32,8 @@ namespace dd99::wayland
         {
         protected: // types
             using engine_t = engine<>;
-            friend engine_t;
+            // friend engine_t;
+            friend dd99::wayland::detail::engine_impl;
             using object_id_t = engine_t::object_id_t;
             using version_t = engine_t::version_t;
             using opcode_t = engine_t::opcode_t;
@@ -72,7 +73,7 @@ namespace dd99::wayland
 
 
         protected:
-            virtual void parse_and_dispatch_event(iovec *, std::size_t) = 0;
+            virtual void parse_and_dispatch_event(std::span<char> data) = 0;
 
 
         protected: // for debugging
