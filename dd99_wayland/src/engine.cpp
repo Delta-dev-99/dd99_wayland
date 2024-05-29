@@ -34,25 +34,64 @@ namespace dd99::wayland
             static constexpr object_id_t server_object_id_base = 0xFF000000;
 
 
-            engine_impl(engine_cb_t _cb, void * _user_data)
-                : cb{_cb}
-                , user_data{_user_data}
-            { }
-
-
-
-            // std::size_t process_input(iovec * data, std::size_t iovec_count);
-            std::size_t process_input(std::span<char> data);
-
-            dd99::wayland::proto::wayland::display & get_display();
-
-
-
             engine_cb_t cb; // output callback
             void * user_data; // user data for output callback
             
             object_map<proto::interface, object_id_t, client_object_id_base> m_client_object_map{};
             object_map<proto::interface, object_id_t, server_object_id_base> m_server_object_map{};
+
+
+
+            engine_impl(engine_cb_t _cb, void * _user_data)
+                : cb{_cb}
+                , user_data{_user_data}
+            {
+                // m_client_object_map.insert(std::make_unique<dd99::wayland::d)
+            }
+
+
+
+            // std::size_t process_input(iovec * data, std::size_t iovec_count);
+            std::size_t process_input(std::span<char> data)
+            {
+                std::size_t consumed = 0;
+
+                // process one message per cycle
+                // stop when there's not enough data to complete a message
+                for(;;)
+                {
+                    const auto available_data = data.size() - consumed;
+                    constexpr auto hdr_size = sizeof(object_id_t) + sizeof(message_size_t);
+
+                    if (available_data < hdr_size) break;
+
+                    object_id_t msg_obj_id = *reinterpret_cast<std::uint32_t *>(data.data());
+                    message_size_t msg_size = static_cast<std::uint16_t>((*(reinterpret_cast<std::uint32_t *>(data.data()) + 1)) >> 16);
+                    
+                    if (available_data < msg_size) break;
+                    consumed += msg_size;
+                    
+                    m_client_object_map[msg_obj_id]->parse_and_dispatch_event(data);
+
+                    data = data.subspan(msg_size);
+                }
+
+                return consumed;
+            }
+
+            dd99::wayland::proto::wayland::display & get_display()
+            {
+                return *reinterpret_cast<dd99::wayland::proto::wayland::display *>(m_client_object_map[1].get());
+            }
+
+            auto store_new_interface(std::unique_ptr<dd99::wayland::proto::interface> new_interface)
+            -> std::pair<object_id_t, dd99::wayland::proto::interface &>
+            {
+                auto iter = m_client_object_map.insert(std::move(new_interface));
+                (*iter)->m_object_id = iter.get_key();
+                return {iter.get_key(), **iter};
+            }
+            
         };
 
     }
@@ -77,7 +116,18 @@ namespace dd99::wayland
     // }
     std::size_t engine<engine_cb_t>::process_input(std::span<char> data) { return impl->process_input(data); }
 
-    proto::wayland::display & engine<engine_cb_t>::get_display() { return impl->get_display(); }
+    // proto::wayland::display & engine<engine_cb_t>::get_display() { return impl->get_display(); }
+
+    void engine<engine_cb_t>::destroy_iterface(const proto::interface & x)
+    {
+        
+    }
+
+    auto engine<engine_cb_t>::store_new_interface(std::unique_ptr<dd99::wayland::proto::interface> new_interface)
+    -> std::pair<object_id_t, dd99::wayland::proto::interface &>
+    {
+        impl->store_new_interface(std::move(new_interface));
+    }
 
 
 
@@ -85,33 +135,6 @@ namespace dd99::wayland
 
     namespace detail
     {
-        std::size_t engine_impl::process_input(std::span<char> data)
-        {
-            std::size_t consumed = 0;
-
-            // process one message per cycle
-            // stop when there's not enough data to complete a message
-            for(;;)
-            {
-                const auto available_data = data.size() - consumed;
-                constexpr auto hdr_size = sizeof(object_id_t) + sizeof(message_size_t);
-
-                if (available_data < hdr_size) break;
-
-                object_id_t msg_obj_id = *reinterpret_cast<std::uint32_t *>(data.data());
-                message_size_t msg_size = static_cast<std::uint16_t>((*(reinterpret_cast<std::uint32_t *>(data.data()) + 1)) >> 16);
-                
-                if (available_data < msg_size) break;
-                consumed += msg_size;
-                
-                m_client_object_map[msg_obj_id]->parse_and_dispatch_event(data);
-
-                data = data.subspan(msg_size);
-            }
-
-            return consumed;
-        }
-
 
         // std::size_t engine_impl::process_input(iovec * data, std::size_t iovec_count)
         // {

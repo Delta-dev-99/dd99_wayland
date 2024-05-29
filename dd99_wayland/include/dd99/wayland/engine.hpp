@@ -35,7 +35,7 @@ namespace dd99::wayland
     // Core of wayland interaction
     // This class acts as an engine for (de)marshaling and dispatching of wayland protocol data
     // 
-    // This is the default template instantiation
+    // This is the default template specialization
     // Other template specializations are wrappers around this one
     // This template specialization implements the engine logic
     template<>
@@ -62,7 +62,8 @@ namespace dd99::wayland
     
     public:
         // get a reference of the root object of the protocol: the wayland display
-        dd99::wayland::proto::wayland::display & get_display();
+        // dd99::wayland::proto::wayland::display & get_display();
+        void bind_display();
 
     
     public: // I/O API
@@ -103,7 +104,7 @@ namespace dd99::wayland
     protected: // API exposed to interfaces
         friend struct dd99::wayland::proto::interface;
 
-        template <class Interface> std::pair<object_id_t, Interface> create_interface();
+        template <class Interface> std::pair<object_id_t, Interface &> create_interface(); // called by interfaces on messages
         void destroy_iterface(const proto::interface & x); // called by interface destructors
 
         // accessor for protocol-defined interfaces
@@ -115,6 +116,10 @@ namespace dd99::wayland
             void destroy_interface(const proto::interface & x) { return m_engine.destroy_iterface(x); }
         };
 
+    
+    private:
+        std::pair<object_id_t, dd99::wayland::proto::interface &> store_new_interface(std::unique_ptr<dd99::wayland::proto::interface>);
+
 
     private:
         using impl_t = detail::engine_impl;
@@ -124,11 +129,20 @@ namespace dd99::wayland
         std::unique_ptr<impl_t, impl_deleter_t> impl;
     };
 
+    template <class Interface>
+    inline auto engine<engine_cb_t>::create_interface() -> std::pair<object_id_t, Interface &>
+    {
+        // Interface x{.m_engine = engine_accessor{*this}};
+        auto && [id, new_interface_ref] = store_new_interface(std::make_unique<Interface>(engine_accessor{*this}));
+        return {id, *reinterpret_cast<Interface *>(& new_interface_ref)};
+    }
+
 
 
 
 
     // wrapper to allow custom callback types
+    // this is the main definition of the template
     template <class OutCB>
     struct engine : engine<engine_cb_t>
     {
@@ -148,12 +162,9 @@ namespace dd99::wayland
         OutCB output_cb;
     };
 
-
-
-
-
     // engine template deduction guide to prioritize basic callback form
     template <std::convertible_to<engine_cb_t> T>
     engine(T&&) -> engine<engine_cb_t>;
+    
 
 }
