@@ -1,0 +1,12 @@
+
+... How to create interfaces?
+How to allow custom callback types (lambdas)?
+
+interface construction must set callback types
+engine sends messages that act on interfaces (sent by user calling interface methods)
+interfaces must be registered with engine for id allocation
+
+interfaces are a way of sending messages and receiving events on object ids
+interfaces must acquire object id on creation and release it on destruction (raii)
+interfaces are only created through methods on other interfaces (not direct construction)
+
