@@ -15,17 +15,12 @@
 #include "dd99-wayland-client-protocol-wayland.hpp"
 
 
-int main()
+namespace wlp = dd99::wayland::proto;
+
+
+
+auto connect_to_wayland_server(asio::io_context & io_ctx)
 {
-    asio::io_context io_ctx;
-
-    // struct wnd
-    // {
-    //     void event() {}
-    // } mywnd;
-    // dd99::wayland::engine wl{[&](std::span<unsigned char>, std::span<int>){mywnd.event();}};
-
-
     auto wayland_path = []()->std::filesystem::path {
         std::filesystem::path wayland_display = []()->const char * {
             auto env = std::getenv("WAYLAND_DISPLAY");
@@ -45,6 +40,17 @@ int main()
     asio::local::stream_protocol::socket sock{io_ctx};
     sock.connect(asio::local::stream_protocol::endpoint{wayland_path});
 
+    return sock;
+}
+
+
+
+int main()
+{
+    asio::io_context io_ctx;
+
+    auto sock = connect_to_wayland_server(io_ctx);
+
     // connected!
 
     dd99::wayland::engine wl_eng
@@ -54,6 +60,8 @@ int main()
             asio::write(sock, asio::buffer(data));
         }
     };
+    // auto disp = wl_eng.get_display();
+    // wlp::wayland::display disp{}
 
 
 
