@@ -96,7 +96,7 @@ namespace dd99::wayland
 
         constexpr reference at(key_type key)
         {
-            auto & r = *this[key];
+            auto & r = (*this)[key];
 
             // check if object is present in map
             // !r translates to a call to std::unique_ptr<T>::operator bool
@@ -119,8 +119,8 @@ namespace dd99::wayland
             {
                 new_key = m_freelist.top();
                 m_freelist.pop();
-                assert(!*this[new_key]); // check the id is not in use
-                *this[new_key] = std::move(x);
+                assert(!(*this)[new_key]); // check the id is not in use
+                (*this)[new_key] = std::move(x);
             }
             else
             {
