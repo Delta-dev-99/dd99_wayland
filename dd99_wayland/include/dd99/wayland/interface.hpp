@@ -49,9 +49,8 @@ namespace dd99::wayland
 
 
         protected: // construction (only by engine)
-            interface(engine_t & engine, object_id_t id)
-                : m_engine{engine}
-                , m_object_id{id}
+            interface(engine_t::engine_accessor engine_accessor)
+                : m_engine{engine_accessor}
             { }
 
         
