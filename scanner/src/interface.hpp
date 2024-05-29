@@ -68,6 +68,7 @@ struct interface_t : element_t
             "{1}static static_data_t static_data;\n"
             "\n"
             // "{1}void parse_and_dispatch_event(iovec *, std::size_t);\n"
+            // "{1}{3}(engine_t::engine_accessor _engine\n"
             "{1}void parse_and_dispatch_event(std::span<char>);\n"
             // "{0}private:\n"
             // "{1}{3}(engine_t & engine)\n"
@@ -92,7 +93,7 @@ struct interface_t : element_t
         ctx.output.put('\n');
         for (const auto & event : msg_collection_incoming)
         {
-            ctx.output.format("{}using {}_cb_t = ", whitespace{ctx.indent_size * ctx.indent_level}, event.name);
+            ctx.output.format("{}using {}_cb_sig_t = ", whitespace{ctx.indent_size * ctx.indent_level}, event.name);
             event.print_callback_signature(ctx);
             ctx.output.write(";\n");
         }
