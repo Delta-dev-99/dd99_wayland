@@ -39,7 +39,7 @@ struct message_t : element_t
 
     void print_callback_signature(code_generation_context_t & ctx) const
     {
-        ctx.output.write("void (*)(void * userdata");
+        ctx.output.write("void (void * userdata");
         for (const auto & arg : args)
         {
             ctx.output.write(", ");
