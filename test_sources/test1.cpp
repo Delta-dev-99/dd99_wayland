@@ -1,18 +1,15 @@
-#include <bits/types/struct_iovec.h>
+#include "dd99-wayland-client-protocol-wayland.hpp"
+#include <dd99/wayland/wayland_client.hpp>
+
+#include <asio.hpp>
+
+#include <stdexcept>
+#include <thread>
+#include <vector>
+
 #include <chrono>
 #include <cstdlib>
 #include <filesystem>
-#include <dd99/wayland/wayland_client.hpp>
-#include <stdexcept>
-#include <asio.hpp>
-#include <thread>
-#include <vector>
-#include "asio/buffer.hpp"
-#include "asio/connect.hpp"
-#include "asio/io_context.hpp"
-#include "asio/local/stream_protocol.hpp"
-#include "asio/write.hpp"
-#include "dd99-wayland-client-protocol-wayland.hpp"
 
 
 namespace wlp = dd99::wayland::proto;
@@ -44,6 +41,23 @@ auto connect_to_wayland_server(asio::io_context & io_ctx)
 }
 
 
+struct engine : dd99::wayland::engine
+{
+    engine(asio::local::stream_protocol::socket & sock)
+        : m_sock(sock)
+    {}
+
+
+    void on_output(std::span<char> data, std::span<int> ancillary_output_fd_collection) override
+    {
+        asio::write(m_sock, asio::buffer(data));
+    }
+
+
+    asio::local::stream_protocol::socket & m_sock;
+};
+
+
 
 int main()
 {
@@ -53,13 +67,9 @@ int main()
 
     // connected!
 
-    dd99::wayland::engine wl_eng
-    {
-        [&](std::span<unsigned char> data, std::span<int>)
-        {
-            asio::write(sock, asio::buffer(data));
-        }
-    };
+    engine wl_eng{sock};
+    auto & display = wl_eng.create_display();
+    // auto && [display_id, wl_display] = wl_eng.allocate_interface<dd99::wayland::proto::wayland::display>();
     // auto disp = wl_eng.get_display();
     // wlp::wayland::display disp{}
 
