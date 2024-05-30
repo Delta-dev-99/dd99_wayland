@@ -37,6 +37,23 @@ struct message_t : element_t
     // std::string get_return_type_string() const
     // { return (ret_index != std::numeric_limits<std::size_t>::max()) ? args[ret_index].to_string() : "void"; }
 
+    void print_virtual_callback(code_generation_context_t & ctx) const
+    {
+        ctx.output.format("virtual void on_{}(", name);
+        bool first_arg = true;
+        for (const auto & arg : args)
+        {
+            if (!first_arg) ctx.output.write(", ");
+            first_arg = false;
+            arg.print_type(ctx);
+            ctx.output.put(' ');
+            if (arg.base_type.type == argument_type_t::type_t::TYPE_OBJECT || arg.base_type.type == argument_type_t::type_t::TYPE_NEWID)
+                ctx.output.write("& ");
+            arg.print_name(ctx);
+        }
+        ctx.output.write(") {}");
+    }
+
     void print_callback_signature(code_generation_context_t & ctx) const
     {
         ctx.output.write("void (void * userdata");
@@ -45,6 +62,8 @@ struct message_t : element_t
             ctx.output.write(", ");
             arg.print_type(ctx);
             ctx.output.put(' ');
+            if (arg.base_type.type == argument_type_t::type_t::TYPE_OBJECT || arg.base_type.type == argument_type_t::type_t::TYPE_NEWID)
+                ctx.output.write("& ");
             arg.print_name(ctx);
         }
         ctx.output.put(')');
@@ -80,11 +99,11 @@ struct message_t : element_t
             ctx.output.format("\n{}", whitespace{ctx.indent_size * (ctx.indent_level + 1)});
             if (returns_unknown_interface)
             {
-                ctx.output.write("auto [new_id, new_interface] = m_engine.create_interface<T>();\n");
+                ctx.output.write("auto [new_id, new_interface] = m_engine.allocate_interface<T>();\n");
             }
             else
             {
-                ctx.output.write("auto [new_id, new_interface] = m_engine.create_interface<");
+                ctx.output.write("auto [new_id, new_interface] = m_engine.allocate_interface<");
                 args[ret_index].print_type(ctx);
                 ctx.output.write(">();\n");
             }
@@ -122,7 +141,8 @@ private:
     void print_prototype(code_generation_context_t & ctx, std::string_view scope = {}) const
     {
         auto has_return_type = ret_index != std::numeric_limits<std::size_t>::max();
-        auto returns_unknown_interface = has_return_type && (args[ret_index].base_type.type == argument_type_t::type_t::TYPE_NEWID) && args[ret_index].interface.empty();
+        auto returns_interface = has_return_type && (args[ret_index].base_type.type == argument_type_t::type_t::TYPE_NEWID);
+        auto returns_unknown_interface = returns_interface && args[ret_index].interface.empty();
 
         // indentation
         ctx.output.format("{}", whitespace{ctx.indent_size * ctx.indent_level});
@@ -130,12 +150,14 @@ private:
         // make template in this case
         if (returns_unknown_interface)
             ctx.output.write("template <Interface_C T> ");
+        else if (returns_interface)
+            ctx.output.format("template <std::derived_from<{}> T> ", remove_wayland_prefix(args[ret_index].interface));
 
         // inline
         if (!scope.empty()) ctx.output.write("inline ");
 
         //return type
-        if (returns_unknown_interface) ctx.output.put('T');
+        if (returns_interface) ctx.output.write("T &");
         else if (has_return_type) args[ret_index].print_type(ctx);
         else ctx.output.write("void");
 
@@ -156,6 +178,7 @@ private:
             if (!is_first_arg) ctx.output.write(", ");
             argument.print_type(ctx);
             ctx.output.put(' ');
+            if (!argument.interface.empty()) ctx.output.write("& ");
             argument.print_name(ctx);
 
             is_first_arg = false;
