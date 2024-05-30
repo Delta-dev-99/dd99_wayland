@@ -62,18 +62,18 @@ struct interface_t : element_t
 
         // inherit base class and begin struct scope
         ctx.output.format(""
-            "{0}struct {3} final : dd99::wayland::proto::interface {{\n"
+            "{0}struct {3} : dd99::wayland::proto::interface {{\n"
             "{1}static constexpr std::string_view interface_name{{\"{5}\"}};\n"
             "{1}static constexpr version_t interface_version = {4};\n"
             "{1}static static_data_t static_data;\n"
             "\n"
             // "{1}void parse_and_dispatch_event(iovec *, std::size_t);\n"
             // "{1}{3}(engine_t::engine_accessor _engine\n"
-            "{1}void parse_and_dispatch_event(std::span<char>);\n"
             // "{0}private:\n"
-            // "{1}{3}(engine_t & engine)\n"
-            // "{2}: dd99::wayland::proto::interface{{engine}}\n"
-            // "{1}{{ }}\n\n"
+            "{1}{3}(engine & eng)\n"
+            "{2}: dd99::wayland::proto::interface{{eng}}\n"
+            "{1}{{ }}\n\n"
+            "{1}void parse_and_dispatch_event(std::span<char>);\n"
             // "{0}public:\n"
             // "{1}version_t get_interface_version() override {{ return interface_version; }}\n"
             // "{1}static_data_t & get_static_data() override {{ return static_data; }}\n"
@@ -90,12 +90,23 @@ struct interface_t : element_t
         for (const auto & request : msg_collection_outgoing)
             request.print_declaration(ctx);
 
+        // events (signatures)
+        // ctx.output.put('\n');
+        // for (const auto & event : msg_collection_incoming)
+        // {
+        //     ctx.output.format("{}using {}_cb_sig_t = ", whitespace{ctx.indent_size * ctx.indent_level}, event.name);
+        //     event.print_callback_signature(ctx);
+        //     ctx.output.write(";\n");
+        // }
+        // ctx.indent_level--;
+
+        // events (virtual functions)
         ctx.output.put('\n');
         for (const auto & event : msg_collection_incoming)
         {
-            ctx.output.format("{}using {}_cb_sig_t = ", whitespace{ctx.indent_size * ctx.indent_level}, event.name);
-            event.print_callback_signature(ctx);
-            ctx.output.write(";\n");
+            ctx.output.format("{}", whitespace{ctx.indent_level * ctx.indent_size});
+            event.print_virtual_callback(ctx);
+            ctx.output.put('\n');
         }
         ctx.indent_level--;
 
