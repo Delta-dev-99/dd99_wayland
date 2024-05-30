@@ -2,7 +2,6 @@
 
 #include "element.hpp"
 #include "formatting.hpp"
-#include <stdexcept>
 #include <string_view>
 
 
@@ -109,8 +108,8 @@ struct argument_t : element_t
         else if (is_interface()) ctx.output.write(interface.empty() ? "interface" : remove_wayland_prefix(interface));
         else ctx.output.write(base_type.protocol_basic_type_to_cpp_type_string());
 
-        auto is_reference = (base_type.type == argument_type_t::type_t::TYPE_OBJECT);
-        if (is_reference) ctx.output.write(" &");
+        // auto is_reference = (base_type.type == argument_type_t::type_t::TYPE_OBJECT);
+        // if (is_reference) ctx.output.write(" &");
     }
 
     void print_name(code_generation_context_t & ctx) const
