@@ -1,5 +1,6 @@
 #pragma once
 
+#include "formatting.hpp"
 #include "interface.hpp"
 
 
@@ -34,6 +35,18 @@ struct protocol_t : element_t
             ctx.output.put('\n');
             x.print_function_definitions(ctx);
         }
+
+        ctx.indent_level--;
+        print_namespace_end(ctx);
+    }
+
+    void print_src(code_generation_context_t & ctx) const
+    {
+        print_namespace_begin(ctx);
+        ctx.indent_level++;
+
+        ctx.output.put('\n');
+        for (const auto & x : interfaces) x.print_src(ctx);
 
         ctx.indent_level--;
         print_namespace_end(ctx);
