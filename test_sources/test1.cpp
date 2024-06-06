@@ -20,6 +20,7 @@
 
 
 namespace wlp = dd99::wayland::proto;
+namespace pw = wlp::wayland;
 
 
 
@@ -63,6 +64,7 @@ auto connect_to_wayland_server(asio::io_context & io_ctx)
 }
 
 
+
 struct engine final : dd99::wayland::engine
 {
     using sock_type = asio::buffered_write_stream<asio::local::stream_protocol::socket &>;
@@ -87,9 +89,9 @@ struct engine final : dd99::wayland::engine
     
 // };
 
-struct registry : dd99::wayland::proto::wayland::registry
+struct registry final : pw::registry
 {
-    using dd99::wayland::proto::wayland::registry::registry;
+    using pw::registry::registry;
 
     void on_global(std::uint32_t name, std::string_view interface, std::uint32_t version) override
     {
