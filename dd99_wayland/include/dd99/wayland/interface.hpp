@@ -1,9 +1,11 @@
 #pragma once
 
 
+#include "dd99/wayland/message_marshaling.hpp"
 #include <dd99/wayland/types.hpp>
 #include <dd99/wayland/config.hpp>
 #include <dd99/wayland/engine.hpp>
+#include <dd99/wayland/message_parsing.hpp> // used by interfaces that include this file
 
 // #include <bits/types/struct_iovec.h>
 
@@ -66,17 +68,20 @@ namespace dd99::wayland::proto
         // static data annexed to each interface class
         struct static_data_t
         {
-            version_t server_supported_version = 0;
+            // TODO: server supported version should be set to 0 until server reports information about it.
+            // However, server is assumed to support basic wayland protocol interfaces
+            // This value temporarily set to 1 to avoid version check failures
+            version_t server_supported_version = 1;
         };
 
     
     protected: // functions exposed to derived classes
         template <class ... Args>
-        void send_wayland_message(opcode_t opcode, Args && ... args);
+        void send_wayland_message(opcode_t opcode, std::span<int> ancillary_fds, Args && ... args);
 
 
     protected: // functions that derived classes must implement
-        virtual void parse_and_dispatch_event(std::span<char> data) = 0;
+        virtual void parse_and_dispatch_event(std::span<const char> data) = 0;
 
 
     protected: // for debugging
@@ -100,6 +105,14 @@ namespace dd99::wayland::proto
             }
         }
     };
+
+
+
+    template <class ... Args>
+    void interface::send_wayland_message(opcode_t opcode, std::span<int> fds, Args && ... args)
+    {
+        detail::message_marshal(m_engine, m_object_id, opcode, fds, std::forward<Args>(args) ...);
+    }
 
 }
 
