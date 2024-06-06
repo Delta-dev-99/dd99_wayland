@@ -45,10 +45,16 @@ struct message_t : element_t
         {
             if (!first_arg) ctx.output.write(", ");
             first_arg = false;
-            arg.print_type(ctx);
-            ctx.output.put(' ');
-            if (arg.base_type.type == argument_type_t::type_t::TYPE_OBJECT || arg.base_type.type == argument_type_t::type_t::TYPE_NEWID)
-                ctx.output.write("& ");
+            if (arg.base_type.type == argument_type_t::type_t::TYPE_NEWID)
+                ctx.output.write("object_id_t ");
+            else
+            {
+                arg.print_type(ctx);
+                ctx.output.put(' ');
+
+                if (arg.base_type.type == argument_type_t::type_t::TYPE_OBJECT)
+                    ctx.output.write("* ");
+            }
             arg.print_name(ctx);
         }
         ctx.output.write(") {}");
@@ -83,6 +89,8 @@ struct message_t : element_t
 
 
         print_prototype(ctx, scope);
+
+        // TODO: support ancillary fd
         
         // function body
         ctx.output.format(""
@@ -97,23 +105,23 @@ struct message_t : element_t
         if (has_return_type) 
         {
             ctx.output.format("\n{}", whitespace{ctx.indent_size * (ctx.indent_level + 1)});
-            if (returns_unknown_interface)
-            {
+            // if (returns_unknown_interface)
+            // {
                 ctx.output.write("auto [new_id, new_interface] = m_engine.allocate_interface<T>();\n");
-            }
-            else
-            {
-                ctx.output.write("auto [new_id, new_interface] = m_engine.allocate_interface<");
-                args[ret_index].print_type(ctx);
-                ctx.output.write(">();\n");
-            }
+            // }
+            // else
+            // {
+            //     ctx.output.write("auto [new_id, new_interface] = m_engine.allocate_interface<");
+            //     args[ret_index].print_type(ctx);
+            //     ctx.output.write(">();\n");
+            // }
             // ctx.output.format("{}const auto new_id = new_interface.get_id();\n", whitespace{ctx.indent_size * (ctx.indent_level + 1)});
         }
         ctx.output.format(""
             "\n"
             "{0}dbg_check_version(since, static_data.server_supported_version, interface_name);\n"
             "\n"
-            "{0}send_wayland_message(opcode"
+            "{0}send_wayland_message(opcode, {{}}"
         , whitespace{ctx.indent_size * (ctx.indent_level + 1)});
         if (has_return_type) ctx.output.write(", new_id");
         // passing arguments to `send_wayland_message`
