@@ -66,7 +66,7 @@ namespace dd99::wayland
             constexpr iterator & operator++() { advance_to_next(); return *this; }
             constexpr iterator operator++(int) { auto tmp = *this; advance_to_next(); return tmp; }
             constexpr reference operator*() const { return *current; }
-            constexpr key_type get_key() const { return current - container->m_objects.begin(); }
+            constexpr key_type get_key() const { return base_key + static_cast<key_type>(current - container->m_objects.begin()); }
 
 
         private:
@@ -81,6 +81,11 @@ namespace dd99::wayland
 
     public:
 
+        // check if key is within container bounds
+        constexpr bool is_in_range(key_type key)
+        {
+            return key_bounds_check(key);
+        }
 
         // constexpr const_reference operator[](key_type key) const
         // {
@@ -124,7 +129,7 @@ namespace dd99::wayland
             }
             else
             {
-                new_key = base_key + m_objects.size();
+                new_key = static_cast<key_type>(base_key + m_objects.size());
                 m_objects.push_back(std::move(x));
             }
             return iterator{this, new_key};
@@ -185,9 +190,9 @@ namespace dd99::wayland
 
 
     private:
-        clearable_stack<key_type, std::vector<key_type>> m_freelist;
+        clearable_stack<key_type, std::vector<key_type>> m_freelist{};
         // std::stack<key_type, std::vector<key_type>> m_freelist;
-        underlying_t m_objects;
+        underlying_t m_objects{};
     };
 
 }
