@@ -85,7 +85,7 @@ struct message_t : element_t
     void print_definition(code_generation_context_t & ctx, std::string_view scope = {}) const
     {
         auto has_return_type = ret_index != std::numeric_limits<std::size_t>::max();
-        auto returns_unknown_interface = has_return_type && (args[ret_index].base_type.type == argument_type_t::type_t::TYPE_NEWID) && args[ret_index].interface.empty();
+        // auto returns_unknown_interface = has_return_type && (args[ret_index].base_type.type == argument_type_t::type_t::TYPE_NEWID) && args[ret_index].interface.empty();
 
 
         print_prototype(ctx, scope);

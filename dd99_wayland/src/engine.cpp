@@ -32,7 +32,7 @@ namespace dd99::wayland
             if (available_data < hdr_size) break;
 
             object_id_t msg_obj_id = *reinterpret_cast<const std::uint32_t *>(data.data());
-            message_size_t msg_size = static_cast<const std::uint16_t>((*(reinterpret_cast<const std::uint32_t *>(data.data()) + 1)) >> 16);
+            message_size_t msg_size = static_cast<std::uint16_t>((*(reinterpret_cast<const std::uint32_t *>(data.data()) + 1)) >> 16);
             
             if (available_data < msg_size) break;
             consumed += msg_size;
