@@ -33,7 +33,10 @@ namespace dd99::wayland
 
 
 
-    
+    // The engine stores all created interfaces and assigns an object-id to new interfaces
+    // Interface creation/destruction and binding can only be done by the engine
+    // Interface functions that create new interfaces delegate construction to the engine
+    // 
     // The reading/writing of data through the connection to wayland server is up to the user
     // To use: inherit from this class and define the virtual methods
     struct engine
@@ -50,10 +53,27 @@ namespace dd99::wayland
         engine(const engine &) = delete; // no copy
         engine(engine&&) = default; // default move
 
+
+    public: // API
+
+        proto::interface * get_interface(object_id_t id); // nullptr when not found
+        template <class T> T * get_interface(object_id_t id) { return reinterpret_cast<T *>(get_interface(id)); }
+
     
     public: // Wayland-related API
 
         // create display of user-derived type
+        // An engine can only have one display and it must be the first created object.
+        // 
+        // Second display instance:
+        // If a second display is created, it will result in assertion failure at runtime (if assertions are enabled).
+        // If assertions are disabled, the new instance will be created without errors, but it will not receive any events and using any of it's functions will probably result in a protocol error.
+        // 
+        // More specifically, the main display instance is predefined at object id 1 and does not need to be registered.
+        // The creation of the display only registers the new instance internally in the engine (locally).
+        // This does not register a new object id with the wayland server.
+        // A second instance will (locally) get object id 2 or above. Using it's functions will result in a message sent to the server that uses an object id that was not registered.
+        // The server has no way to interpret that message.
         template <std::derived_from<proto::wayland::display> T = proto::wayland::display, class ... Args>
         T & create_display(Args && ... args);
 
@@ -72,7 +92,7 @@ namespace dd99::wayland
         // 
         // @RETURN: bytes consumed
         // std::size_t process_input(iovec * data, std::size_t iovec_count);
-        std::size_t process_input(std::span<char> data);
+        std::size_t process_input(std::span<const char> data);
 
 
     public: // I/O Events that MUST be implemented by derived clases
@@ -83,10 +103,10 @@ namespace dd99::wayland
         // Signature:
         //  `data` is just binary data to be sent to the server
         //  `fds` is a collection of file descriptors to be sent as ancillary data
-        virtual void on_output(std::span<char> data, std::span<int> ancillary_output_fd_collection) = 0;
+        virtual void on_output(std::span<const char> data, std::span<int> ancillary_output_fd_collection) = 0;
 
 
-    public: // internal functions used by protocol interfaces
+    public: // internal functions used by protocol interfaces. Do not use directly. TODO: move to accessor for interfaces
 
         std::pair<object_id_t, proto::interface &> bind_interface(std::unique_ptr<proto::interface>);
 
@@ -118,7 +138,7 @@ namespace dd99::wayland
     template<class T, class ... Args>
     std::pair<object_id_t, T &> engine::allocate_interface(Args && ... args)
     {
-        auto && [new_id, new_interface] = bind_interface(new T{*this, std::forward<Args>(args)...});
+        auto && [new_id, new_interface] = bind_interface(std::make_unique<T>(*this, std::forward<Args>(args)...));
         return {new_id, reinterpret_cast<T&>(new_interface)};
     }
 
