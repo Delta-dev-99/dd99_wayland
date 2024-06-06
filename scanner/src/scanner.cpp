@@ -295,6 +295,19 @@ int main(int argc, char ** argv)
         ctx.output.format(""
             "#include \"{}\"\n"
         , hdr_rel_path.generic_string());
+
+        // begin namespace for protocols
+        ctx.output.write("\n\n"
+            "namespace dd99::wayland::proto{\n");
+
+        for (const auto & protocol : protocols)
+        {
+            protocol.print_src(ctx);
+        }
+
+        // end namespace for protocols
+        ctx.output.write("\n"
+            "} // namespace dd99::wayland::proto\n");
     }
 
 }
