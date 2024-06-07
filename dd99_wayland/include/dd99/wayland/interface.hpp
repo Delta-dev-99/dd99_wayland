@@ -1,15 +1,15 @@
 #pragma once
 
 
-#include "dd99/wayland/message_marshaling.hpp"
-#include <dd99/wayland/types.hpp>
 #include <dd99/wayland/config.hpp>
 #include <dd99/wayland/engine.hpp>
+#include <dd99/wayland/interface_concept.hpp>
+#include <dd99/wayland/message_marshaling.hpp>
 #include <dd99/wayland/message_parsing.hpp> // used by interfaces that include this file
+#include <dd99/wayland/types.hpp>
 
 // #include <bits/types/struct_iovec.h>
 
-#include <concepts>
 #include <cstdint>
 #include <format>
 #include <source_location>
@@ -20,15 +20,9 @@
 namespace dd99::wayland::proto
 {
 
-    // fw declaration
-    struct interface;
-
-    template <class T, class Id_T, Id_T Base>
-    struct object_map;
-
-
-    // concept of interface: derives from dd99::wayland::proto::interface
-    template <class T> concept Interface_C = std::derived_from<T, interface>;
+    // // fw declaration
+    // template <class T, class Id_T, Id_T Base>
+    // struct object_map;
 
 
 
@@ -111,7 +105,15 @@ namespace dd99::wayland::proto
     template <class ... Args>
     void interface::send_wayland_message(opcode_t opcode, std::span<int> fds, Args && ... args)
     {
-        detail::message_marshal(m_engine, m_object_id, opcode, fds, std::forward<Args>(args) ...);
+        auto interfaces_to_ids = []<class T>(T && t)
+        {
+            // incomplete types are treated as interfaces
+            if constexpr (!requires{sizeof(std::remove_cvref_t<T>);}) return reinterpret_cast<const interface &>(t).m_object_id;
+            else if constexpr (Interface_C<std::remove_cvref_t<T>>) return reinterpret_cast<const interface &>(t).m_object_id;
+            else return std::forward<T>(t);
+        };
+
+        detail::message_marshal(m_engine, m_object_id, opcode, fds, interfaces_to_ids.template operator()<Args>(args) ...);
     }
 
 }
