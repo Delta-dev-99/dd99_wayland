@@ -1,12 +1,12 @@
 #pragma once
 
-#include "dd99/wayland/types.hpp"
-#include <concepts>
+#include <dd99/wayland/engine.hpp>
+
 #include <cstddef>
 #include <cstdint>
-#include <dd99/wayland/engine.hpp>
 #include <string_view>
 #include <tuple>
+#include <type_traits>
 #include <utility>
 
 
@@ -17,7 +17,7 @@ namespace dd99::wayland::detail
     template <class T>
     inline constexpr std::size_t _marshal_size_one(T && v)
     {
-        if constexpr (std::same_as<T, std::string_view>)
+        if constexpr (std::same_as<std::remove_cvref_t<T>, std::string_view>)
         {
             // 32-bit size, then the payload, padded to 32-bit alignment
             return v.size() + sizeof(std::uint32_t) + 
@@ -34,10 +34,11 @@ namespace dd99::wayland::detail
     {
         // TODO: array
 
-        if constexpr (std::same_as<T, std::string_view>)
+        if constexpr (std::same_as<std::remove_cvref_t<T>, std::string_view>)
         {
             auto size = static_cast<std::uint32_t>(v.size());
-            eng.on_output({reinterpret_cast<char *>(&size), sizeof(size)}, fds);
+            eng.on_output({reinterpret_cast<char *>(&size), sizeof(size)}, {});
+            eng.on_output(v, fds);
         }
         else
         {
