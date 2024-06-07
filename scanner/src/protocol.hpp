@@ -57,7 +57,7 @@ private:
     {
         // TODO: sanitize comments
         // print copyright and descriptions first 
-        ctx.output.format("\n\n{}// PROTOCOL {}\n", whitespace{ctx.indent_size * ctx.indent_level}, name);
+        ctx.output.format("\n{}// PROTOCOL {}\n", whitespace{ctx.indent_size * ctx.indent_level}, name);
         if (!summary.empty()) ctx.output.format("{}// SUMMARY: {}\n", whitespace{ctx.indent_size * ctx.indent_level}, summary);
         if (!description.empty()) ctx.output.format("{0}/* DESCRIPTION:\n{1}\n{0}*/\n", whitespace{ctx.indent_size * ctx.indent_level}, indent_lines{description, ctx.indent_size * ctx.indent_level});
         if (!copyright_str.empty()) ctx.output.format("{0}/* COPYRIGHT:\n{1}\n{0}*/\n", whitespace{ctx.indent_size * ctx.indent_level}, indent_lines{copyright_str, ctx.indent_size * ctx.indent_level});
