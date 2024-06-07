@@ -35,13 +35,23 @@ namespace dd99::wayland::proto
         // are parsed as plain object id's and are interpreted by caller
     }
 
-    template <class ... Args>
-    std::tuple<Args...> parse_msg_args(std::span<const char> buffer)
-    {
-        std::size_t consumed = 0;
-        auto get_elem = [&]<class U>(){ auto && [n, elem] = parse_msg_arg<U>(buffer.subspan(consumed)); consumed += n; return elem; };
+    // NOTE: this approach reverses parsing order due to function argument evaluation order being unspecified in C++
+    // keeping this here for a while (so this note shows up on the next git commit)
+    // template <class ... Args>
+    // std::tuple<Args...> parse_msg_args(std::span<const char> buffer)
+    // {
+    //     std::size_t consumed = 0;
+    //     auto get_elem = [&]<class U>(){ auto && [n, elem] = parse_msg_arg<U>(buffer.subspan(consumed)); consumed += n; return elem; };
 
-        return std::make_tuple(get_elem.template operator()<Args>()...);
+    //     return std::make_tuple(get_elem.template operator()<Args>()...);
+    // }
+
+    template <class T, class ... Args>
+    std::tuple<T, Args...> parse_msg_args(std::span<const char> buffer)
+    {
+        auto [consumed, parsed_elem] = parse_msg_arg<T>(buffer);
+        if constexpr (sizeof...(Args) == 0) return std::make_tuple(std::move(parsed_elem));
+        else return std::tuple_cat(std::make_tuple(std::move(parsed_elem)), parse_msg_args<Args...>(buffer.subspan(consumed)));
     }
 
 }
