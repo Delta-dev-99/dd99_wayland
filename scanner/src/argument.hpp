@@ -104,8 +104,14 @@ struct argument_t : element_t
         auto is_enum = [&](){ return base_type.type == argument_type_t::type_t::TYPE_ENUM; };
         auto is_interface = [&](){ return base_type.type == argument_type_t::type_t::TYPE_NEWID || base_type.type == argument_type_t::type_t::TYPE_OBJECT; };
 
+
         if (is_enum()) ctx.output.format("{}::{}", enum_interface, enum_name);
-        else if (is_interface()) ctx.output.write(interface.empty() ? "interface" : remove_wayland_prefix(interface));
+        else if (is_interface())
+        {
+            if (interface.empty()) ctx.output.write("interface");
+            else if (ctx.external_inerface_names.contains(interface)) ctx.output.format("{}::{}", extern_interface_protocol_name(interface), remove_wayland_prefix(interface));
+            else ctx.output.write(remove_wayland_prefix(interface));
+        }
         else ctx.output.write(base_type.protocol_basic_type_to_cpp_type_string());
 
         // auto is_reference = (base_type.type == argument_type_t::type_t::TYPE_OBJECT);
