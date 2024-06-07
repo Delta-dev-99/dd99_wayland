@@ -4,7 +4,9 @@
 #include <concepts>
 #include <cstddef>
 #include <iterator>
+#include <set>
 #include <stdexcept>
+#include <string_view>
 #include <system_error>
 #include <unistd.h>
 #include <algorithm>
@@ -33,6 +35,13 @@ inline constexpr std::string_view remove_wayland_prefix(std::string_view name)
     if (name.starts_with("wl_") || name.starts_with("wp_"))
         name.remove_prefix(3);
     return name;
+}
+
+inline constexpr std::string_view extern_interface_protocol_name(std::string_view interface_name)
+{
+    if (interface_name.starts_with("wl_")) return "wayland";
+    else if (interface_name.starts_with("xdg_")) return "xdg_shell";
+    else return "unknown_protocol";
 }
 
 
@@ -219,4 +228,5 @@ struct code_generation_context_t
     fd_buffered_output & output;
     int indent_size = 4; // TODO: add related option
     int indent_level = 0;
+    const std::set<std::string_view> & external_inerface_names;
 };
