@@ -18,6 +18,8 @@
 #include <format>
 #include <iostream>
 #include <iterator>
+#include <set>
+#include <string_view>
 #include <unistd.h>
 
 #include "formatting.hpp"
@@ -240,12 +242,41 @@ int main(int argc, char ** argv)
 
 
 
+    std::set<std::string_view> external_interface_names;
+    // find all interface names used as arguments
+    for (const auto & d : docs)
+    for (const auto & proto : d.children("protocol"))
+    for (const auto & interf : proto.children("interface"))
+    for (const auto & interf_child : interf.children())
+    {
+        if (std::string_view{interf_child.name()} != "event" && 
+            std::string_view{interf_child.name()} != "request")
+            continue;
+
+        for (const auto & arg : interf_child.children("arg"))
+        {
+            std::string_view iname = arg.attribute("interface").value();
+            if (!iname.empty()) external_interface_names.insert(iname);
+        }
+    }
+    // remove names of all interfaces defined in the parsed files
+    for (const auto & p : protocols)
+    for (const auto & interf : p.interfaces)
+    {
+        external_interface_names.erase(interf.original_name);
+    }
+    // print some info
+    std::format_to(std::ostream_iterator<char>{std::cout}, "found {} external interface references\n", external_interface_names.size());
+
+
+
     // * Generate header *
     // -------------------
     {
         code_generation_context_t ctx
         {
             .output = hdr_buffered_output,
+            .external_inerface_names = external_interface_names,
         };
 
         auto main_include = args.main_include;
@@ -264,7 +295,35 @@ int main(int argc, char ** argv)
 
         // begin namespace for protocols
         ctx.output.format("\n\n"
-            "namespace dd99::wayland::proto{{\n");
+            "namespace dd99::wayland::proto{{\n\n");
+
+
+        // forward declarations of interfaces from other, non-parsed, protocols
+        {
+            // for (const auto & p : protocols)
+            // for (const auto & interf : p.interfaces)
+            // {
+            //     for (const auto & msg : interf.msg_collection_incoming)
+            //     {
+            //         for (const auto & arg : msg.args)
+            //     }
+            //     for (const auto & msg : interf.msg_collection_outgoing)
+            //     {
+
+            //     }
+            // }
+
+            if (!external_interface_names.empty()) ctx.output.write("// fw-declarations for external interfaces\n");
+            for (const auto & x : external_interface_names)
+            {
+                ctx.output.format(""
+                    "{}namespace {} {{ struct {}; }}\n"
+                , whitespace{ctx.indent_size * ctx.indent_level}
+                , extern_interface_protocol_name(x)
+                , remove_wayland_prefix(x));
+            }
+            if (!external_interface_names.empty()) ctx.output.put('\n');
+        }
 
         // generate protocols
         for (const auto & protocol : protocols)
@@ -283,6 +342,7 @@ int main(int argc, char ** argv)
         code_generation_context_t ctx
         {
             .output = src_buffered_output,
+            .external_inerface_names = external_interface_names,
         };
 
         // find relative path of header file with respect to source file `hdr_rel_path` to use for "#include"
