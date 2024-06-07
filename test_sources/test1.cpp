@@ -98,14 +98,48 @@ struct registry final : pw::registry
         std::format_to(std::ostream_iterator<char>(std::cout), 
             "registry::on_global    name: {:2}    version: {:2}    interface: {}\n"
         , name, version, interface);
+
+        // if (interface == "xdg_wm_base") bind<>(std::uint32_t name)
     }
+
+    
 };
+
+
+
+void test1()
+{
+    // this function does marshalling and demarshalling of some data to a buffer
+    // used for debugging/testing
+
+    std::vector<char> buffer;
+    struct customengine_t : dd99::wayland::engine
+    {
+        customengine_t(std::vector<char> & buffer_)
+            : buffer(buffer_)
+        { }
+
+        void on_output(std::span<const char> data, std::span<int> ancillary_output_fd_collection) override
+        {
+            for (const auto & x : data)
+                buffer.push_back(x);
+        }
+
+        std::vector<char> & buffer;
+    } customengine{buffer};
+
+    dd99::wayland::detail::message_marshal_one(customengine, {}, 1);
+    dd99::wayland::detail::message_marshal_one(customengine, {}, std::string_view{"something"});
+    auto values = dd99::wayland::proto::parse_msg_args<int, std::string_view>(buffer);
+}
 
 
 
 int main()
 {
     // auto newsock = socket(PF_LOCAL, SOCK_STREAM | SOCK_CLOEXEC, 0);
+
+    test1();
 
     asio::io_context io_ctx;
 
