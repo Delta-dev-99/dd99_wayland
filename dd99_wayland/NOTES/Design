@@ -10,3 +10,23 @@ interfaces are a way of sending messages and receiving events on object ids
 interfaces must acquire object id on creation and release it on destruction (raii)
 interfaces are only created through methods on other interfaces (not direct construction)
 
+
+
+
+
+
+
+Interfaces are created by user (user manages lifetime)
+*** User must ensure interface instances remain valid while the engine holds a reference to it
+Constructor has as first argument a reference to the engine
+Base class `interface` holds object id
+Derived interface classes hold static data and constexpr data
+Engine holds a vector of pointers to interface instances (created by user)
+
+interface instance functions that create new interfaces will instead act as binders for user created interface instances
+
+what about events that create interfaces?
+
+
+... so, user creates callback interface using a lambda or something
+callback interface is bound by call to `display.sync()`
