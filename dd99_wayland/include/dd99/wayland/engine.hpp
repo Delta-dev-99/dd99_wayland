@@ -1,6 +1,7 @@
 #pragma once
 
 
+#include <dd99/wayland/interface_binder.hpp>
 #include <dd99/wayland/types.hpp>
 
 #include <cassert>
@@ -14,22 +15,12 @@
 namespace dd99::wayland
 {
 
-    // fw-declaration of wayland display interface
-    // namespace proto{
-    //     struct interface;
-    //     namespace wayland{
-    //         struct display;
-    //     }
-    // }
-
-
     // fw-declarations
     namespace proto { struct interface; }
     namespace proto::wayland { struct display; }
 
     // for pimpl
     namespace detail { struct engine_data; }
-
 
 
 
@@ -55,14 +46,12 @@ namespace dd99::wayland
 
 
     public: // API
-
         proto::interface * get_interface(object_id_t id); // nullptr when not found
         template <class T> T * get_interface(object_id_t id) { return reinterpret_cast<T *>(get_interface(id)); }
 
     
     public: // Wayland-related API
 
-        // create display of user-derived type
         // An engine can only have one display and it must be the first created object.
         // 
         // Second display instance:
@@ -74,8 +63,15 @@ namespace dd99::wayland
         // This does not register a new object id with the wayland server.
         // A second instance will (locally) get object id 2 or above. Using it's functions will result in a message sent to the server that uses an object id that was not registered.
         // The server has no way to interpret that message.
-        template <std::derived_from<proto::wayland::display> T = proto::wayland::display, class ... Args>
-        T & create_display(Args && ... args);
+        void bind_display(proto::wayland::display & display_instance)
+        {
+            auto new_id = bind_interface(reinterpret_cast<proto::interface &>(display_instance));
+
+            // wayland display must be the first object bound
+            // more than one display is not allowed
+            // *** user is responsible for this ***
+            assert(new_id == 1);
+        }
 
 
     public: // I/O API
@@ -108,12 +104,14 @@ namespace dd99::wayland
 
     public: // internal functions used by protocol interfaces. Do not use directly. TODO: move to accessor for interfaces
 
-        std::pair<object_id_t, proto::interface &> bind_interface(std::unique_ptr<proto::interface>);
+        object_id_t bind_interface(proto::interface &);
 
-        template <class T, class ... Args>
-        std::pair<object_id_t, T &> allocate_interface(Args && ... args);
+        void unbind_interface(object_id_t id);
 
-        void free_interface(proto::interface &);
+        // template <class T, class ... Args>
+        // std::pair<object_id_t, T &> allocate_interface(Args && ... args);
+
+        // void free_interface(proto::interface &);
 
 
     private: // auxiliary type definitions
@@ -135,20 +133,20 @@ namespace dd99::wayland
 
 
 
-    template<class T, class ... Args>
-    std::pair<object_id_t, T &> engine::allocate_interface(Args && ... args)
-    {
-        auto && [new_id, new_interface] = bind_interface(std::make_unique<T>(*this, std::forward<Args>(args)...));
-        return {new_id, reinterpret_cast<T&>(new_interface)};
-    }
+    // template<class T, class ... Args>
+    // std::pair<object_id_t, T &> engine::allocate_interface(Args && ... args)
+    // {
+    //     auto && [new_id, new_interface] = bind_interface(std::make_unique<T>(*this, std::forward<Args>(args)...));
+    //     return {new_id, reinterpret_cast<T&>(new_interface)};
+    // }
 
 
-    template <std::derived_from<proto::wayland::display> T, class ... Args>
-    T & engine::create_display(Args && ... args)
-    {
-        auto && [new_id, new_interface] = bind_interface(std::make_unique<T>(*this, std::forward<Args>(args)...));
-        assert(new_id == 1);
-        return reinterpret_cast<T&>(new_interface);
-    }
+    // template <std::derived_from<proto::wayland::display> T, class ... Args>
+    // T & engine::create_display(Args && ... args)
+    // {
+    //     auto && [new_id, new_interface] = bind_interface(std::make_unique<T>(*this, std::forward<Args>(args)...));
+    //     assert(new_id == 1);
+    //     return reinterpret_cast<T&>(new_interface);
+    // }
 
 }
