@@ -3,12 +3,11 @@
 
 #include <dd99/wayland/config.hpp>
 #include <dd99/wayland/engine.hpp>
+#include <dd99/wayland/interface_binder.hpp>
 #include <dd99/wayland/interface_concept.hpp>
 #include <dd99/wayland/message_marshaling.hpp>
 #include <dd99/wayland/message_parsing.hpp> // used by interfaces that include this file
 #include <dd99/wayland/types.hpp>
-
-// #include <bits/types/struct_iovec.h>
 
 #include <cstdint>
 #include <format>
@@ -20,42 +19,21 @@
 namespace dd99::wayland::proto
 {
 
-    // // fw declaration
-    // template <class T, class Id_T, Id_T Base>
-    // struct object_map;
-
-
-
     // base class for all protocol-defined interfaces
     // objects are instances of derived classes
+    // derived classes are generated from xml protocol descriptions
     struct interface
     {
     protected: // types
         friend dd99::wayland::engine;
-        // using engine_t = engine<>;
-        // // friend engine_t;
-        // friend dd99::wayland::detail::engine_impl;
-        // using object_id_t = engine_t::object_id_t;
-        // using version_t = engine_t::version_t;
-        // using opcode_t = engine_t::opcode_t;
 
 
-    protected: // member variables
-        // engine_t::engine_accessor m_engine;
-        engine & m_engine;
-        std::uint32_t m_object_id = 0;
-
-
-    protected:
+    public: // constructor/destructor
+        virtual ~interface() = default;
 
         interface(engine & eng)
             : m_engine{eng}
         { }
-
-
-    public: // destructor
-
-        virtual ~interface() = default;
     
     
     protected:
@@ -74,7 +52,7 @@ namespace dd99::wayland::proto
         void send_wayland_message(opcode_t opcode, std::span<int> ancillary_fds, Args && ... args);
 
 
-    protected: // functions that derived classes must implement
+    protected: // functions that derived classes must implement (generated from xml)
         virtual void parse_and_dispatch_event(std::span<const char> data) = 0;
 
 
@@ -98,44 +76,33 @@ namespace dd99::wayland::proto
                         , interface_name)};
             }
         }
+
+
+    protected: // member variables
+        engine & m_engine;
+        std::uint32_t m_object_id = 0;
     };
 
 
 
+    // ***********************************************
+    // * Template member functions (implementations) *
+    // ***********************************************
+
+    // transform interface references to object_ids and forward to marshalling
     template <class ... Args>
     void interface::send_wayland_message(opcode_t opcode, std::span<int> fds, Args && ... args)
     {
         auto interfaces_to_ids = []<class T>(T && t)
         {
-            // incomplete types are treated as interfaces
+            // incomplete types are assumed to be interfaces
             if constexpr (!requires{sizeof(std::remove_cvref_t<T>);}) return reinterpret_cast<const interface &>(t).m_object_id;
             else if constexpr (Interface_C<std::remove_cvref_t<T>>) return reinterpret_cast<const interface &>(t).m_object_id;
             else return std::forward<T>(t);
         };
 
-        detail::message_marshal(m_engine, m_object_id, opcode, fds, interfaces_to_ids.template operator()<Args>(args) ...);
+        dd99::wayland::detail::message_marshal(m_engine, m_object_id, opcode, fds
+            , interfaces_to_ids.template operator()<Args>(args) ...);
     }
 
 }
-
-
-
-// 
-// NOTES on marshalling:
-// 
-// there's a global registry object
-// We have data about interfaces supported by server
-// 
-
-
-
-// una "interface" es el conjunto de funciones, con sus versiones (compile-time data)
-// el servidor soporta un conjunto de interfaces con versiones especificas (run-time data)
-// un objeto tiene id e interface
-
-
-// cada "interface" `interface_x` se representa por una clase derivada de cierta base
-// los datos son: los prototipos de funciones y los datos `static` de la clase
-
-// `interface_x` deriva de `interface` (referred as `base` here)
-// 
