@@ -18,10 +18,10 @@
 
 
 
-namespace dd99::wayland
+namespace dd99::wayland::detail
 {
 
-    template <class Tp, class Sequence = std::deque<Tp>>
+    template <class Tp, class Sequence = std::vector<Tp>>
     struct clearable_stack : std::stack<Tp, Sequence>
     {
         using base = std::stack<Tp, Sequence>;
@@ -29,23 +29,24 @@ namespace dd99::wayland
         void clear() { base::c.clear(); }
     };
 
-    // A wrapper around std::vector<std::unique_ptr<T>>.
+
+    // A wrapper around std::vector<T*>.
     // Acts as a map<Id_T, T*> where keys are automatically allocated sequentially.
-    // Erasing elements uses a freelist and does not affect other elements (constant time).
-    // Template argument `Base` is the Id of the first element. All element Ids are offset by this value.
-    template <class T, class Id_T, Id_T Base>
+    // Erasing elements uses a freelist and does not affect other elements (constant time, no invalidation except iterator to erased element).
+    // Template argument `Base_ID` is the Id of the first element. All element Ids are offset by this value.
+    template <class T, class ID_T, ID_T Base_ID>
     struct object_map
     {
-        using key_type = Id_T;
-        using mapped_type = T;
-        using value_type = std::unique_ptr<mapped_type>;
+        using key_type = ID_T;
+        using mapped_type = T*;
+        using value_type = T*;
         using size_type = std::make_unsigned<key_type>;
         using difference_type = std::make_signed<key_type>;
         using reference = value_type &;
         using const_reference = const value_type &;
         using underlying_t = std::vector<value_type>;
 
-        static constexpr key_type base_key = Base;
+        static constexpr key_type base_key = Base_ID;
 
         struct iterator
         {
@@ -78,9 +79,7 @@ namespace dd99::wayland
         };
         
 
-
     public:
-
         // check if key is within container bounds
         constexpr bool is_in_range(key_type key)
         {
@@ -101,7 +100,7 @@ namespace dd99::wayland
 
         constexpr reference at(key_type key)
         {
-            auto & r = (*this)[key];
+            auto & r = operator[](key);
 
             // check if object is present in map
             // !r translates to a call to std::unique_ptr<T>::operator bool
@@ -134,28 +133,28 @@ namespace dd99::wayland
             }
             return iterator{this, new_key};
         }
-        template <class U = T, class ... Args>
-        constexpr iterator emplace(Args && ... args)
-        {
-            key_type new_key;
+        // template <class U = T, class ... Args>
+        // constexpr iterator emplace(Args && ... args)
+        // {
+        //     key_type new_key;
 
-            if (!m_freelist.empty())
-            {
-                new_key = m_freelist.top();
-                m_freelist.pop();
-                assert(!m_objects[new_key]); // check the id is not in use
-                m_objects[new_key] = std::make_unique<U>(std::forward<Args>(args)...);
-            }
-            else
-            {
-                new_key = m_objects.size();
-                m_objects.emplace_back(std::make_unique<U>(std::forward<Args>(args)...));
-            }
-            return iterator{this, new_key};
-        }
+        //     if (!m_freelist.empty())
+        //     {
+        //         new_key = m_freelist.top();
+        //         m_freelist.pop();
+        //         assert(!m_objects[new_key]); // check the id is not in use
+        //         m_objects[new_key] = std::make_unique<U>(std::forward<Args>(args)...);
+        //     }
+        //     else
+        //     {
+        //         new_key = m_objects.size();
+        //         m_objects.emplace_back(std::make_unique<U>(std::forward<Args>(args)...));
+        //     }
+        //     return iterator{this, new_key};
+        // }
         constexpr void erase(key_type key)
         {
-            iterator{this, key}->reset();
+            operator[](key) = nullptr;
             m_freelist.push(key);
         }
         // swap
@@ -183,9 +182,8 @@ namespace dd99::wayland
         }
         constexpr bool is_object_present(key_type key)
         {
-            // iterator points to std::unique_ptr
-            // this calls it's operator bool()
-            return (*iterator{this, key});
+            // contextual conversion from pointer to bool
+            return (operator[](key));
         }
 
 
