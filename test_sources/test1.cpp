@@ -1,6 +1,7 @@
 #include "asio/buffer.hpp"
 #include "asio/buffered_write_stream.hpp"
 #include "dd99-wayland-client-protocol-wayland.hpp"
+#include "dd99-wayland-client-protocol-xdg-shell.hpp"
 #include "dd99/wayland/engine.hpp"
 #include <cstring>
 #include <dd99/wayland/wayland_client.hpp>
@@ -84,25 +85,58 @@ struct engine final : dd99::wayland::engine
 };
 
 
-// struct display final : dd99::wayland::proto::wayland::display
-// {
-    
-// };
+
+struct display final : pw::display
+{
+    using pw::display::display;
+
+protected:
+    void on_delete_id(std::uint32_t id) override
+    {
+        m_engine.unbind_interface(id);
+    }
+};
+
 
 struct registry final : pw::registry
 {
-    using pw::registry::registry;
+    registry(engine & eng)
+        : pw::registry{eng}
+        , xdg_wm_base{eng}
+        , compositor{eng}
+        , shared_memory{eng}
+    { }
 
+protected:
     void on_global(std::uint32_t name, std::string_view interface, std::uint32_t version) override
     {
         std::format_to(std::ostream_iterator<char>(std::cout), 
             "registry::on_global    name: {:2}    version: {:2}    interface: {}\n"
         , name, version, interface);
 
-        // if (interface == "xdg_wm_base") bind<>(std::uint32_t name)
+        if (interface == "xdg_wm_base") bind(name, xdg_wm_base);
+        else if (interface == "wl_compositor") bind(name, compositor);
+        else if (interface == pw::shm::interface_name) bind(name, shared_memory);
     }
 
-    
+public:
+    wlp::xdg_shell::xdg_wm_base xdg_wm_base;
+    pw::compositor compositor;
+    pw::shm shared_memory;
+};
+
+
+template <class F>
+struct callback final : pw::callback
+{
+    callback(dd99::wayland::engine & eng, F && f)
+        : pw::callback{eng}
+        , m_f{f}
+    { }
+
+    void on_done(std::uint32_t) override { m_f(); }
+
+    F m_f;
 };
 
 
@@ -137,40 +171,80 @@ void test1()
 
 int main()
 {
-    // auto newsock = socket(PF_LOCAL, SOCK_STREAM | SOCK_CLOEXEC, 0);
-
-    test1();
-
     asio::io_context io_ctx;
 
     auto sock = connect_to_wayland_server(io_ctx);
-
-    asio::buffered_write_stream<decltype(sock) &> bufsock{sock, 1024*4};
+    auto bufsock = asio::buffered_write_stream<decltype(sock) &>{sock, 1024*4};
 
     // connected!
 
-    engine wl_eng{bufsock};
-    auto & display = wl_eng.create_display();
-    auto & reg = display.get_registry<registry>();
+    engine eng{bufsock};
+    display disp{eng};
+    registry reg{eng};
+    callback cb{eng, [](){ std::cout << "synced\n"; }};
 
-    // auto && [display_id, wl_display] = wl_eng.allocate_interface<dd99::wayland::proto::wayland::display>();
-    // auto disp = wl_eng.get_display();
-    // wlp::wayland::display disp{}
+    eng.bind_display(disp);
+    disp.get_registry(reg);
+
+    // auto & display = wl_eng.create_display();
+    // auto & reg = display.get_registry<registry>();
+
+    disp.sync(cb);
 
 
     asio::error_code ec;
-
-
     std::vector<char> buf;
     buf.resize(1024*4);
     std::size_t chars_in_buf = 0;
     for (;;) {
         auto n_written [[maybe_unused]] = bufsock.flush();
         chars_in_buf += bufsock.read_some(asio::buffer(buf.data() + chars_in_buf, buf.size() - chars_in_buf), ec);
-        auto n_consumed = wl_eng.process_input({buf.data(), buf.data() + chars_in_buf});
+        auto n_consumed = eng.process_input({buf.data(), buf.data() + chars_in_buf});
         if (n_consumed != chars_in_buf) std::memmove(buf.data(), buf.data() + n_consumed, chars_in_buf - n_consumed);
         chars_in_buf -= n_consumed;
-        // buf.erase(buf.begin(), buf.begin() + n_consumed);
-        // std::this_thread::sleep_for(std::chrono::microseconds{20});
     }
 }
+
+
+
+// int main()
+// {
+//     // auto newsock = socket(PF_LOCAL, SOCK_STREAM | SOCK_CLOEXEC, 0);
+
+//     test1();
+
+//     asio::io_context io_ctx;
+
+//     auto sock = connect_to_wayland_server(io_ctx);
+
+//     asio::buffered_write_stream<decltype(sock) &> bufsock{sock, 1024*4};
+
+//     // connected!
+
+//     engine wl_eng{bufsock};
+//     auto & display = wl_eng.create_display();
+//     auto & reg = display.get_registry<registry>();
+
+//     display.sync<>()
+
+//     // auto && [display_id, wl_display] = wl_eng.allocate_interface<dd99::wayland::proto::wayland::display>();
+//     // auto disp = wl_eng.get_display();
+//     // wlp::wayland::display disp{}
+
+
+//     asio::error_code ec;
+
+
+//     std::vector<char> buf;
+//     buf.resize(1024*4);
+//     std::size_t chars_in_buf = 0;
+//     for (;;) {
+//         auto n_written [[maybe_unused]] = bufsock.flush();
+//         chars_in_buf += bufsock.read_some(asio::buffer(buf.data() + chars_in_buf, buf.size() - chars_in_buf), ec);
+//         auto n_consumed = wl_eng.process_input({buf.data(), buf.data() + chars_in_buf});
+//         if (n_consumed != chars_in_buf) std::memmove(buf.data(), buf.data() + n_consumed, chars_in_buf - n_consumed);
+//         chars_in_buf -= n_consumed;
+//         // buf.erase(buf.begin(), buf.begin() + n_consumed);
+//         // std::this_thread::sleep_for(std::chrono::microseconds{20});
+//     }
+// }
