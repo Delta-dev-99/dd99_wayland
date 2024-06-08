@@ -1,23 +1,19 @@
-#include "asio/buffer.hpp"
-#include "asio/buffered_write_stream.hpp"
+
 #include "dd99-wayland-client-protocol-wayland.hpp"
 #include "dd99-wayland-client-protocol-xdg-shell.hpp"
-#include "dd99/wayland/engine.hpp"
-#include <cstring>
+
 #include <dd99/wayland/wayland_client.hpp>
 
 #include <asio.hpp>
 
+#include <cstdlib>
+#include <cstring>
+#include <filesystem>
 #include <format>
 #include <iostream>
 #include <iterator>
 #include <stdexcept>
-#include <sys/socket.h>
-#include <thread>
 #include <vector>
-#include <chrono>
-#include <cstdlib>
-#include <filesystem>
 
 
 namespace wlp = dd99::wayland::proto;
