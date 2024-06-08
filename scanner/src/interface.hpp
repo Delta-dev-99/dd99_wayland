@@ -227,9 +227,9 @@ struct interface_t : element_t
             "{1}{3}(engine & eng)\n"
             "{2}: dd99::wayland::proto::interface{{eng}}\n"
             "{1}{{ }}\n"
-            "{1}\n"
-            "{0}public: // used internally for dispatching events\n"
-            "{1}void parse_and_dispatch_event(std::span<const char>){6}\n"
+            // "{1}\n"
+            // "{0}protected: // used internally for dispatching events\n"
+            // "{1}void parse_and_dispatch_event(std::span<const char>){6}\n"
             "{1}\n"
             "{0}public: // API requests\n"
         , whitespace{ctx.indent_size * ctx.indent_level}
@@ -237,8 +237,7 @@ struct interface_t : element_t
         , whitespace{ctx.indent_size * (ctx.indent_level + 2)}
         , name
         , version
-        , original_name
-        , msg_collection_incoming.empty() ? " {} // no events" : ";");
+        , original_name);
 
         // requests (fw declarations)
         ctx.indent_level++;
@@ -255,18 +254,29 @@ struct interface_t : element_t
         // }
         // ctx.indent_level--;
 
-        ctx.output.format(""
-            "\n{}public: // API events\n"
-        , whitespace{ctx.indent_size * (ctx.indent_level - 1)});
-
-        // events (virtual functions)
-        for (const auto & event : msg_collection_incoming)
+        if (!msg_collection_incoming.empty())
         {
-            ctx.output.format("{}", whitespace{ctx.indent_level * ctx.indent_size});
-            event.print_virtual_callback(ctx);
-            ctx.output.put('\n');
+            ctx.output.format(""
+                "\n{}protected: // API events\n"
+            , whitespace{ctx.indent_size * (ctx.indent_level - 1)});
+
+            // events (virtual functions)
+            for (const auto & event : msg_collection_incoming)
+            {
+                ctx.output.format("{}", whitespace{ctx.indent_level * ctx.indent_size});
+                event.print_virtual_callback(ctx);
+                ctx.output.put('\n');
+            }
         }
+
         ctx.indent_level--;
+
+        ctx.output.format(""
+            "\n{}protected: // used internally for dispatching events\n"
+            "{}void parse_and_dispatch_event(std::span<const char>){}\n"
+        , whitespace{ctx.indent_size * ctx.indent_level}
+        , whitespace{ctx.indent_size * (ctx.indent_level + 1)}
+        , msg_collection_incoming.empty() ? " {} // no events" : ";");
 
         // for (const auto & event : server_to_client_msg_collection)
         //     event.print_declaration_r(ctx);
