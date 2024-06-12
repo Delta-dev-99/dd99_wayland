@@ -1,18 +1,14 @@
 #pragma once
 
 
-#include <dd99/wayland/config.hpp>
 #include <dd99/wayland/engine.hpp>
-#include <dd99/wayland/interface_binder.hpp>
+// #include <dd99/wayland/interface_binder.hpp>
 #include <dd99/wayland/interface_concept.hpp>
 #include <dd99/wayland/message_marshaling.hpp>
 #include <dd99/wayland/message_parsing.hpp> // used by interfaces that include this file
 #include <dd99/wayland/types.hpp>
 
-#include <cstdint>
-#include <format>
-#include <source_location>
-#include <stdexcept>
+#include <type_traits>
 
 
 
@@ -38,13 +34,20 @@ namespace dd99::wayland::proto
     
     protected:
         // static data annexed to each interface class
-        struct static_data_t
-        {
-            // TODO: server supported version should be set to 0 until server reports information about it.
-            // However, server is assumed to support basic wayland protocol interfaces
-            // This value temporarily set to 1 to avoid version check failures
-            version_t server_supported_version = 1;
-        };
+        // struct static_data_t
+        // {
+        //     // TODO: server supported version should be set to 0 until server reports information about it.
+        //     // However, server is assumed to support basic wayland protocol interfaces
+        //     // This value temporarily set to 1 to avoid version check failures
+        //     version_t server_supported_version = 1;
+        // };
+
+    
+    public: // API common to all interfaces
+        auto get_id() const { return m_object_id; }
+        auto get_version() const { return m_version; }
+        virtual std::string_view get_interface_name() const = 0;
+        // virtual static_data_t & get_interface_static_data() = 0;
 
     
     protected: // functions exposed to derived classes
@@ -56,31 +59,10 @@ namespace dd99::wayland::proto
         virtual void parse_and_dispatch_event(std::span<const char> data) = 0;
 
 
-    protected: // for debugging
-        constexpr void dbg_check_version(version_t minimum_required_version,
-                                            version_t server_supported_version,
-                                            std::string_view interface_name,
-                                            const std::source_location& location = std::source_location::current()) 
-        {
-            if constexpr (is_debug_enabled())
-            {
-                if (server_supported_version < minimum_required_version)
-                    throw std::runtime_error{std::format(
-                            "[DD99_WAYLAND] In file {}:{}:{}: In function {}: ERROR: Version check failed. Server supported version: {}. Minimum required version: {}."
-                        , location.file_name()
-                        , location.line()
-                        , location.column()
-                        , location.function_name()
-                        , server_supported_version
-                        , minimum_required_version
-                        , interface_name)};
-            }
-        }
-
-
     protected: // member variables
         engine & m_engine;
-        std::uint32_t m_object_id = 0;
+        object_id_t m_object_id = 0;
+        version_t m_version = 0;
     };
 
 
@@ -106,3 +88,6 @@ namespace dd99::wayland::proto
     }
 
 }
+
+
+#include <dd99/wayland/detail/debug.hpp>
