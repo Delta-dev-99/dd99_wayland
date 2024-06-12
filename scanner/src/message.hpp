@@ -3,8 +3,6 @@
 #include "argument.hpp"
 #include "element.hpp"
 #include "formatting.hpp"
-#include <cstddef>
-#include <limits>
 #include <unistd.h>
 
 
@@ -38,36 +36,96 @@ struct message_t : element_t
     // std::string get_return_type_string() const
     // { return (ret_index != std::numeric_limits<std::size_t>::max()) ? args[ret_index].to_string() : "void"; }
 
-    void print_virtual_callback(code_generation_context_t & ctx) const
+    void print_virtual_callback_declaration(code_generation_context_t & ctx) const
     {
-        // virtual void on_{}(arg_type arg_name, ...)
-        // type transformations:
-        //  newid -> object_id_t
-        //  object -> object *
+        print_virtual_callback_prototype(ctx);
+        ctx.output.write(";\n");
+    }
 
-        ctx.output.format("virtual void on_{}(", name);
-        bool first_arg = true;
+    void print_virtual_callback_definition(code_generation_context_t & ctx, bool outside_class = false) const
+    {
+        print_virtual_callback_prototype(ctx, outside_class);
+        ctx.output.format("\n"
+            "{}{{\n"
+            "{}dbg::log_message(\"{}\", \"{}\", dbg::direction::incoming, m_object_id\n"
+        , whitespace{ctx.indent_size * ctx.indent_level}
+        , whitespace{ctx.indent_size * (ctx.indent_level + 1)}
+        , ctx.current_interface
+        , name
+        );
+
+        ctx.indent_level++;
+
         for (const auto & arg : args)
         {
-            if (!first_arg) ctx.output.write(", ");
-            first_arg = false;
-            if (arg.base_type.type == argument_type_t::type_t::TYPE_NEWID)
-                ctx.output.write("object_id_t ");
+            const bool is_new = arg.base_type == argument_type_t::TYPE_NEWID;
+            const bool is_interface = arg.base_type == argument_type_t::TYPE_OBJECT;
+            const bool is_string = arg.base_type == argument_type_t::TYPE_STRING;
+            const bool is_int = arg.base_type == argument_type_t::TYPE_INT || arg.base_type == argument_type_t::TYPE_UINT;
+
+            // new-id is prefixed by interface name string and version when not explicit by protocol
+            if (is_new && arg.interface.empty())
+            {
+                ctx.output.format(""
+                    "{0}, std::format(\"{1}_interface: '{{}}'\", {1}_interface.sv())\n"
+                    "{0}, std::format(\"{1}_version: '{{}}'\", {1}_version)\n"
+                , whitespace{ctx.indent_size * (ctx.indent_level + 1)}
+                , arg.name
+                );
+            }
+
+            ctx.output.format(""
+                "{}, std::format(\"{}: "
+            , whitespace{ctx.indent_size * (ctx.indent_level + 1)}
+            , format::argument_name_cpp{ctx, arg}
+            );
+
+            if (is_new) ctx.output.write("new ");
+            // if (is_string) ctx.output.write("string");
+            if (arg.base_type == argument_type_t::TYPE_FD)
+                ctx.output.write("[FILE] ");
+            if (arg.base_type == argument_type_t::TYPE_ARRAY)
+                ctx.output.write("array ");
+            else if (!is_string && !is_int)
+                ctx.output.format("{} ", format::argument_type_cpp{ctx, arg});
+
+            if (is_interface || is_new) ctx.output.put('@');
+            if (is_string) ctx.output.write("'{}'\", ");
+            else ctx.output.write("{}\", ");
+
+            if (is_interface)
+            {
+                ctx.output.write("reinterpret_cast<interface *>(");
+                print_argument_name(ctx, arg);
+                ctx.output.write(")->get_id()");
+            }
+            else if (!arg.enum_name.empty())
+            {
+                ctx.output.write("static_cast<std::uint32_t>(");
+                print_argument_name(ctx, arg);
+                ctx.output.write(")");
+            }
+            else if (arg.base_type == argument_type_t::TYPE_STRING)
+            {
+                print_argument_name(ctx, arg);
+                ctx.output.write(".sv()");
+            }
             else
             {
-                ctx.output.format("{} {}"
-                , format::argument_type_cpp{ctx, arg}
-                , arg.base_type == argument_type_t::TYPE_OBJECT ? "* " : "");
-                // arg.print_type(ctx);
-                // ctx.output.put(' ');
-
-                // if (arg.base_type.type == argument_type_t::type_t::TYPE_OBJECT)
-                //     ctx.output.write("* ");
+                print_argument_name(ctx, arg);
             }
-            print_argument_name(ctx, arg);
-            // arg.print_name(ctx);
+
+            ctx.output.write(")\n");
         }
-        ctx.output.write(") {}");
+        ctx.output.format("{});\n", whitespace{ctx.indent_size * ctx.indent_level});
+
+        ctx.indent_level--;
+
+        // closing brace
+        ctx.output.format(""
+            "{0}}}\n"
+        , whitespace{ctx.indent_size * ctx.indent_level});
+
     }
 
     void print_callback_signature(code_generation_context_t & ctx) const
@@ -117,6 +175,7 @@ struct message_t : element_t
 
         ctx.indent_level++;
 
+        // interface name assertion for undefined new ids
         for (const auto & arg : args)
         {
             if (arg.base_type == argument_type_t::TYPE_NEWID && arg.interface.empty())
@@ -125,14 +184,6 @@ struct message_t : element_t
                     "{0}assert({1}_interface == {1}.get_interface_name());\n"
                 , whitespace{ctx.indent_size * ctx.indent_level}
                 , format::argument_name_cpp{ctx, arg});
-
-                // ctx.output.write("assert(");
-                // print_argument_name(ctx, arg);
-                // // arg.print_name(ctx);
-                // ctx.output.write("_interface == ");
-                // print_argument_name(ctx, arg);
-                // // arg.print_name(ctx);
-                // ctx.output.write(".get_interface_name());\n");
             }
         }
 
@@ -140,10 +191,8 @@ struct message_t : element_t
 
         // count fds
         int fds_count = 0;
-        for (const auto & arg : args)
-        {
-            if (arg.base_type == argument_type_t::TYPE_FD)
-            {
+        for (const auto & arg : args) {
+            if (arg.base_type == argument_type_t::TYPE_FD) {
                 fds_count++;
             }
         }
@@ -165,10 +214,6 @@ struct message_t : element_t
                     ctx.output.format("{}{}"
                     , is_first_arg ? "" : ", "
                     , format::argument_name_cpp{ctx, arg});
-
-                    // if (!is_first_arg) ctx.output.write(", ");
-                    // print_argument_name(ctx, arg);
-                    // arg.print_name(ctx);
 
                     is_first_arg = false;
                 }
@@ -197,22 +242,6 @@ struct message_t : element_t
                 , format::argument_name_cpp{ctx, arg}
                 );
             }
-
-            // ctx.output.write("auto new_");
-            // print_argument_name(ctx, arg);
-            // // arg.print_name(ctx);
-            // ctx.output.write(" = m_engine.bind_interface(");
-            // print_argument_name(ctx, arg);
-            // // arg.print_name(ctx);
-            // ctx.output.write(", ");
-            // if (arg.interface.empty())
-            // {
-            //     print_argument_name(ctx, arg);
-            //     // arg.print_name(ctx);
-            //     ctx.output.write("_version");
-            // }
-            // else ctx.output.write("m_version");
-            // ctx.output.write(");\n");
         }
         
         ctx.output.format("{}", whitespace{ctx.indent_size * ctx.indent_level});
@@ -232,19 +261,10 @@ struct message_t : element_t
             {
                 ctx.output.format("{0}_interface, {0}_version, "
                 , format::argument_name_cpp{ctx, arg});
-
-                // print_argument_name(ctx, arg);
-                // // arg.print_name(ctx);
-                // ctx.output.write("_interface, ");
-                // print_argument_name(ctx, arg);
-                // // arg.print_name(ctx);
-                // ctx.output.write("_version, ");
             }
 
             if (arg.base_type == argument_type_t::TYPE_NEWID) ctx.output.write("new_");
             ctx.output.format("{}", format::argument_name_cpp{ctx, arg});
-            // print_argument_name(ctx, arg);
-            // arg.print_name(ctx);
         }
         // end of `send_wayland_message` invocation
         ctx.output.write(");\n");
@@ -322,28 +342,6 @@ struct message_t : element_t
 
             ctx.output.write(")\n");
 
-            // ctx.output.format(""
-            //     "{}, std::pair<std::string_view, "
-            // , whitespace{ctx.indent_size * (ctx.indent_level + 1)}
-            // );
-
-            // if (arg.base_type.type == argument_type_t::type_t::TYPE_NEWID)
-            //     ctx.output.write("dbg::new_id_wrapper<");
-
-            // arg.print_type(ctx);
-
-            // if (arg.base_type.type == argument_type_t::type_t::TYPE_NEWID)
-            //     ctx.output.write(">");
-            // else
-            //     ctx.output.write(" &");
-
-            // ctx.output.write(">{\"");
-            // print_argument_name(ctx, arg);
-            // // arg.print_name(ctx);
-            // ctx.output.write("\", ");
-            // print_argument_name(ctx, arg);
-            // // arg.print_name(ctx);
-            // ctx.output.write("}\n");
         }
         ctx.output.format("{});\n", whitespace{ctx.indent_size * ctx.indent_level});
 
@@ -362,6 +360,41 @@ private:
         // arg.print_name(ctx);
         // if (remove_wayland_prefix(arg.interface) == arg.name)
         // ctx.output.put('_');
+    }
+
+    void print_virtual_callback_prototype(code_generation_context_t & ctx, bool outside_class = false) const
+    {
+        // virtual void on_{}(arg_type arg_name, ...)
+        // type transformations:
+        //  newid -> object_id_t
+        //  object -> object *
+
+        ctx.output.format(""
+            "{}{} void {}{}on_{}("
+        , whitespace{ctx.indent_level * ctx.indent_size}
+        , outside_class ? "inline" : "virtual"
+        , outside_class ? ctx.current_interface : ""
+        , outside_class ? "::" : ""
+        , name
+        );
+
+        // ctx.output.format("virtual void on_{}(", name);
+        bool first_arg = true;
+        for (const auto & arg : args)
+        {
+            if (!first_arg) ctx.output.write(", ");
+            first_arg = false;
+            if (arg.base_type.type == argument_type_t::type_t::TYPE_NEWID)
+                ctx.output.write("object_id_t ");
+            else
+            {
+                ctx.output.format("{} {}"
+                , format::argument_type_cpp{ctx, arg}
+                , arg.base_type == argument_type_t::TYPE_OBJECT ? "* " : "");
+            }
+            ctx.output.format("{}", format::argument_name_cpp{ctx, arg});
+        }
+        ctx.output.write(")");
     }
 
     // indentation, return type, function name and arguments (no semicolon)
