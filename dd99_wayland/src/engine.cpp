@@ -47,7 +47,7 @@ namespace dd99::wayland
     }
 
 
-    object_id_t engine::bind_interface(proto::interface & interface_instance)
+    object_id_t engine::bind_interface(proto::interface & interface_instance, version_t version)
     {
         // inserting into the object map allocates an object id (the key of the map)
         auto it = m_data_ptr->m_client_object_map.insert(&interface_instance);
@@ -55,6 +55,7 @@ namespace dd99::wayland
         auto new_object_id = it.get_key();
 
         interface_instance.m_object_id = new_object_id;
+        interface_instance.m_version = version;
         return new_object_id;
     }
 
