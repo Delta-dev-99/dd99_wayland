@@ -80,7 +80,7 @@ struct callback final : pw::callback
         , m_f{f}
     { }
 
-    void on_done(std::uint32_t) override { m_f(); }
+    void on_done(std::uint32_t serial) override { pw::callback::on_done(serial); m_f(); }
 
     F m_f;
 };
@@ -98,7 +98,7 @@ struct callback_member final : pw::callback
         , m_f{fnct_ptr}
     { }
 
-    void on_done(std::uint32_t serial) override { (m_i->*m_f)(serial); }
+    void on_done(std::uint32_t serial) override { pw::callback::on_done(serial); (m_i->*m_f)(serial); }
 
     instance_t * m_i;
     void (instance_t::* m_f)(std::uint32_t);
@@ -160,7 +160,7 @@ struct xdg_toplevel final : wlp::xdg_shell::xdg_toplevel
     bool closed = false;
 
 protected:
-    void on_close() override { destroy(); closed = true; }
+    void on_close() override { wlp::xdg_shell::xdg_toplevel::on_close(); destroy(); closed = true; }
 };
 
 struct xdg_surface final : wlp::xdg_shell::xdg_surface
@@ -168,7 +168,7 @@ struct xdg_surface final : wlp::xdg_shell::xdg_surface
     using wlp::xdg_shell::xdg_surface::xdg_surface;
 
 protected:
-    void on_configure(std::uint32_t serial) override { ack_configure(serial); }
+    void on_configure(std::uint32_t serial) override { wlp::xdg_shell::xdg_surface::on_configure(serial); ack_configure(serial); }
 };
 
 
@@ -177,7 +177,7 @@ struct xdg_base final : wlp::xdg_shell::xdg_wm_base
     using wlp::xdg_shell::xdg_wm_base::xdg_wm_base;
 
 protected:
-    void on_ping(std::uint32_t serial) override { pong(serial); }
+    void on_ping(std::uint32_t serial) override { wlp::xdg_shell::xdg_wm_base::on_ping(serial); pong(serial); }
 };
 
 
@@ -193,9 +193,11 @@ struct registry final : pw::registry
 protected:
     void on_global(std::uint32_t name, dd99::wayland::zview interface, std::uint32_t version) override
     {
-        std::format_to(std::ostream_iterator<char>(std::cout), 
-            "registry::on_global    name: {:2}    version: {:2}    interface: {}\n"
-        , name, version, interface.sv());
+        pw::registry::on_global(name, interface, version);
+
+        // std::format_to(std::ostream_iterator<char>(std::cout), 
+        //     "registry::on_global    name: {:2}    version: {:2}    interface: {}\n"
+        // , name, version, interface.sv());
 
         if (interface == wlp::xdg_shell::xdg_wm_base::interface_name) bind(name, interface, version, xdg_wm_base);
         else if (interface == pw::compositor::interface_name) bind(name, interface, version, compositor);
@@ -216,6 +218,7 @@ struct display final : pw::display
 protected:
     void on_delete_id(std::uint32_t id) override
     {
+        pw::display::on_delete_id(id);
         m_engine.unbind_interface(id);
     }
 };
