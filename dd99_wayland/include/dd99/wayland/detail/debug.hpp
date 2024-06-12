@@ -1,5 +1,6 @@
 #pragma once
 
+#include "dd99/wayland/types.hpp"
 #include <concepts>
 #include <dd99/wayland/config.hpp>
 #include <dd99/wayland/interface.hpp>
@@ -10,8 +11,35 @@
 #include <stdexcept>
 #include <format>
 #include <string_view>
-#include <type_traits>
 
+
+
+template <> struct std::formatter<std::span<const char>> : std::formatter<std::string_view> {
+    inline /* constexpr */ auto format(const std::span<const char> & v, format_context & ctx) const
+    {
+        if (v.empty())
+        {
+            std::format_to(ctx.out(), "[0]{{}}");
+            return ctx.out();
+        }
+
+        std::format_to(ctx.out(), "[{}]{{{:x}", v.size(), v.front());
+        for (auto it = ++v.begin(); it != v.end(); ++it)
+        {
+            std::format_to(ctx.out(), ", {:x}", *it);
+        }
+        std::format_to(ctx.out(), "}}");
+
+        return ctx.out();
+    }
+};
+
+template <> struct std::formatter<dd99::wayland::proto::fixed_point> : std::formatter<std::string_view> {
+    inline /* constexpr */ auto format(const dd99::wayland::proto::fixed_point & v, format_context & ctx) const
+    {
+        return std::format_to(ctx.out(), "{}", static_cast<double>(v));
+    }
+};
 
 
 namespace dd99::wayland::dbg
