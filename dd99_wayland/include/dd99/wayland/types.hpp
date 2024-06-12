@@ -17,8 +17,8 @@ namespace dd99::wayland
         struct fixed_point
         {
             constexpr explicit fixed_point(double v) : m_value{static_cast<std::int32_t>(v * 256.0)} {}
-            constexpr explicit operator double() { return to_double(); }
-            constexpr double to_double() { return m_value / 256.0; }
+            constexpr explicit operator double() const { return to_double(); }
+            constexpr double to_double() const { return m_value / 256.0; }
 
         private:
             std::int32_t m_value;
