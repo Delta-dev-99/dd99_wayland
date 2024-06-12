@@ -342,8 +342,7 @@ struct interface_t : element_t
             ctx.indent_level++;
             for (const auto & event : msg_collection_incoming)
             {
-                ctx.output.format("{}", whitespace{ctx.indent_level * ctx.indent_size});
-                event.print_virtual_callback(ctx);
+                event.print_virtual_callback_declaration(ctx);
                 ctx.output.put('\n');
             }
             ctx.indent_level--;
@@ -396,6 +395,12 @@ struct interface_t : element_t
                 "{}}} // namespace detail (enum definitions)\n\n"
             , whitespace{ctx.indent_size * ctx.indent_level}
             );
+        }
+
+        for (const auto & event : msg_collection_incoming)
+        {
+            event.print_virtual_callback_definition(ctx, true);
+            ctx.output.put('\n');
         }
 
         for (const auto & request : msg_collection_outgoing)
