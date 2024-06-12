@@ -65,7 +65,7 @@ namespace dd99::wayland
         // The server has no way to interpret that message.
         void bind_display(proto::wayland::display & display_instance)
         {
-            auto new_id = bind_interface(reinterpret_cast<proto::interface &>(display_instance));
+            auto new_id = bind_interface(reinterpret_cast<proto::interface &>(display_instance), 1);
 
             // wayland display must be the first object bound
             // more than one display is not allowed
@@ -104,7 +104,7 @@ namespace dd99::wayland
 
     public: // internal functions used by protocol interfaces. Do not use directly. TODO: move to accessor for interfaces
 
-        object_id_t bind_interface(proto::interface &);
+        object_id_t bind_interface(proto::interface &, version_t version);
 
         void unbind_interface(object_id_t id);
 
