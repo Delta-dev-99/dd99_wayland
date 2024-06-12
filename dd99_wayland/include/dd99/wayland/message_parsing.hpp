@@ -1,5 +1,6 @@
 #pragma once
 
+#include "dd99/wayland/detail/zview.hpp"
 #include "dd99/wayland/interface.hpp"
 #include "dd99/wayland/types.hpp"
 #include <concepts>
@@ -17,13 +18,26 @@ namespace dd99::wayland::proto
     template <class T>
     std::pair<std::size_t, T> parse_msg_arg(std::span<const char> buffer)
     {
-        // TODO: array
+        // string_view not allowed anymore
+        static_assert(!std::same_as<T, std::string_view>);
 
-        if constexpr (std::same_as<T, std::string_view>) // wayland type: string
+        if constexpr (std::same_as<T, zview>) // wayland type: string
         {
             auto size = *reinterpret_cast<const std::uint32_t *>(buffer.data());
-            return {sizeof(std::uint32_t) + ((size + sizeof(std::uint32_t) - 1) & ~(sizeof(std::uint32_t) - 1))
-                , std::string_view{buffer.data() + sizeof(std::uint32_t), size}};
+            auto size_aligned_to_32bit = (size + sizeof(std::uint32_t) - 1) & ~(sizeof(std::uint32_t) - 1);
+            
+            // size - 1 because we want to ignore the null terminator
+            zview str{buffer.data() + sizeof(std::uint32_t), size - 1};
+            assert(buffer.data()[sizeof(std::uint32_t) + size - 1] == 0); // null terminator
+
+            return {sizeof(std::uint32_t) + size_aligned_to_32bit, str};
+        }
+        else if constexpr (std::same_as<T, std::span<const char>>) // wayland type: array
+        {
+            auto size = *reinterpret_cast<const std::uint32_t *>(buffer.data());
+            auto size_aligned_to_32bit = (size + sizeof(std::uint32_t) - 1) & ~(sizeof(std::uint32_t) - 1);
+
+            return {sizeof(std::uint32_t) + size_aligned_to_32bit, {buffer.data() + sizeof(std::uint32_t), size}};
         }
         else // most argument types have the same binary representation as the corresponding c++ type (and 4 bytes size)
         {
