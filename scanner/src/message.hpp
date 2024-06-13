@@ -44,7 +44,16 @@ struct message_t : element_t
 
     void print_virtual_callback_definition(code_generation_context_t & ctx, bool outside_class = false) const
     {
+        // This function generates the defautl definition for the virtual event callbacks
+        // This is used to log wayland events
         print_virtual_callback_prototype(ctx, outside_class);
+
+        if (!ctx.generate_message_logs)
+        {
+            ctx.output.write(" {}");
+            return;
+        }
+
         ctx.output.format("\n"
             "{}{{\n"
             "{}dbg::log_message(\"{}\", \"{}\", dbg::direction::incoming, m_object_id\n"
@@ -269,81 +278,84 @@ struct message_t : element_t
         // end of `send_wayland_message` invocation
         ctx.output.write(");\n");
 
-        // log message
-        ctx.output.format("\n"
-            "{}dbg::log_message(\"{}\", \"{}\", dbg::direction::outgoing, m_object_id\n"
-        , whitespace{ctx.indent_size * ctx.indent_level}
-        , ctx.current_interface
-        , name);
-        // log message arguments
-        for (const auto & arg : args)
+        if (ctx.generate_message_logs)
         {
-            const bool is_new = arg.base_type == argument_type_t::TYPE_NEWID;
-            const bool is_interface = is_new || arg.base_type == argument_type_t::TYPE_OBJECT;
-            const bool is_string = arg.base_type == argument_type_t::TYPE_STRING;
-            const bool is_int = arg.base_type == argument_type_t::TYPE_INT || arg.base_type == argument_type_t::TYPE_UINT;
-
-            // new-id is prefixed by interface name string and version when not explicit by protocol
-            if (is_new && arg.interface.empty())
+            // log message
+            ctx.output.format("\n"
+                "{}dbg::log_message(\"{}\", \"{}\", dbg::direction::outgoing, m_object_id\n"
+            , whitespace{ctx.indent_size * ctx.indent_level}
+            , ctx.current_interface
+            , name);
+            // log message arguments
+            for (const auto & arg : args)
             {
+                const bool is_new = arg.base_type == argument_type_t::TYPE_NEWID;
+                const bool is_interface = is_new || arg.base_type == argument_type_t::TYPE_OBJECT;
+                const bool is_string = arg.base_type == argument_type_t::TYPE_STRING;
+                const bool is_int = arg.base_type == argument_type_t::TYPE_INT || arg.base_type == argument_type_t::TYPE_UINT;
+
+                // new-id is prefixed by interface name string and version when not explicit by protocol
+                if (is_new && arg.interface.empty())
+                {
+                    ctx.output.format(""
+                        "{0}, std::format(\"{1}_interface: '{{}}'\", {1}_interface.sv())\n"
+                        "{0}, std::format(\"{1}_version: '{{}}'\", {1}_version)\n"
+                    , whitespace{ctx.indent_size * (ctx.indent_level + 1)}
+                    , arg.name
+                    );
+                }
+
                 ctx.output.format(""
-                    "{0}, std::format(\"{1}_interface: '{{}}'\", {1}_interface.sv())\n"
-                    "{0}, std::format(\"{1}_version: '{{}}'\", {1}_version)\n"
+                    "{}, std::format(\""
                 , whitespace{ctx.indent_size * (ctx.indent_level + 1)}
-                , arg.name
                 );
-            }
 
-            ctx.output.format(""
-                "{}, std::format(\""
-            , whitespace{ctx.indent_size * (ctx.indent_level + 1)}
-            );
-
-            print_argument_name(ctx, arg);
-            ctx.output.write(": ");
-
-            if (is_new) ctx.output.write("new ");
-            // if (is_string) ctx.output.write("string");
-            if (arg.base_type == argument_type_t::TYPE_FD)
-            {
-                ctx.output.write("[FILE] ");
-            }
-            else if (!is_string && !is_int)
-            {
-                arg.print_type(ctx);
-                ctx.output.put(' ');
-            }
-
-            if (is_interface) ctx.output.put('@');
-            if (is_string) ctx.output.write("'{}'\", ");
-            else ctx.output.write("{}\", ");
-
-            if (is_interface)
-            {
-                ctx.output.write("reinterpret_cast<interface &>(");
                 print_argument_name(ctx, arg);
-                ctx.output.write(").get_id()");
-            }
-            else if (!arg.enum_name.empty())
-            {
-                ctx.output.write("static_cast<std::uint32_t>(");
-                print_argument_name(ctx, arg);
-                ctx.output.write(")");
-            }
-            else if (arg.base_type == argument_type_t::TYPE_STRING)
-            {
-                print_argument_name(ctx, arg);
-                ctx.output.write(".sv()");
-            }
-            else
-            {
-                print_argument_name(ctx, arg);
-            }
+                ctx.output.write(": ");
 
-            ctx.output.write(")\n");
+                if (is_new) ctx.output.write("new ");
+                // if (is_string) ctx.output.write("string");
+                if (arg.base_type == argument_type_t::TYPE_FD)
+                {
+                    ctx.output.write("[FILE] ");
+                }
+                else if (!is_string && !is_int)
+                {
+                    arg.print_type(ctx);
+                    ctx.output.put(' ');
+                }
 
+                if (is_interface) ctx.output.put('@');
+                if (is_string) ctx.output.write("'{}'\", ");
+                else ctx.output.write("{}\", ");
+
+                if (is_interface)
+                {
+                    ctx.output.write("reinterpret_cast<interface &>(");
+                    print_argument_name(ctx, arg);
+                    ctx.output.write(").get_id()");
+                }
+                else if (!arg.enum_name.empty())
+                {
+                    ctx.output.write("static_cast<std::uint32_t>(");
+                    print_argument_name(ctx, arg);
+                    ctx.output.write(")");
+                }
+                else if (arg.base_type == argument_type_t::TYPE_STRING)
+                {
+                    print_argument_name(ctx, arg);
+                    ctx.output.write(".sv()");
+                }
+                else
+                {
+                    print_argument_name(ctx, arg);
+                }
+
+                ctx.output.write(")\n");
+
+            }
+            ctx.output.format("{});\n", whitespace{ctx.indent_size * ctx.indent_level});
         }
-        ctx.output.format("{});\n", whitespace{ctx.indent_size * ctx.indent_level});
 
         ctx.indent_level--;
 

@@ -241,4 +241,5 @@ struct code_generation_context_t
     const std::set<std::string_view> & external_inerface_names;
     std::string_view current_protocol{};
     std::string_view current_interface{};
+    bool generate_message_logs;
 };

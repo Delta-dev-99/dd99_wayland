@@ -59,6 +59,7 @@ struct scan_args
     bool omit_comments{}; // output comments to generated files?
     enum class visibility_t {PUBLIC, PRIVATE} visibility {visibility_t::PRIVATE};
     enum class side_t {SERVER, CLIENT} side {side_t::CLIENT};
+    bool generate_message_logs = true;
 
     scan_args(int argc, char** argv)
     {
@@ -93,8 +94,9 @@ struct scan_args
                 auto v = x.substr(2);
                 if      (v == "help") print_help = true;
                 else if (v == "version") print_version = true;
-                else if (v == "server_side") side = side_t::SERVER;
-                else if (v == "no_comments") omit_comments = true;
+                else if (v == "server") side = side_t::SERVER;
+                else if (v == "no-comments") omit_comments = true;
+                else if (v == "no-message-logs") generate_message_logs = false;
                 else if (v.starts_with("include="))
                 {
                     if (v.size() == 8)
@@ -173,13 +175,15 @@ inline void print_help(scan_args & args)
         "    {:2}    {:15}        {}\n"
         "    {:2}    {:15}        {}\n"
         "    {:2}    {:15}        {}\n",
+        "    {:2}    {:15}        {}\n",
     args.commandline,
     "-h", "--help"                  , "print this help",
     "-v", "--version"               , "print version",
-    "-s", "--server-side"           , "Generate server-side files. If this option is not present, client-side is assumed",
+    "-s", "--server"                , "Generate server-side files. If this option is not present, client-side is assumed",
     "-c", "--no-comments"           , "Do not output comments to generated files",
+    ""  , "--no-message-logs"       , "Do not generate logging code for wayland messages",
     ""  , "--include=<inc>"         , "Add \"#include inc\" to generated header",
-    ""  , "--main-include=<inc>"    , "Use \"#include inc\" instead of default wayland library header"
+    ""  , "--main-include=<inc>"    , "Use \"#include inc\" instead of default dd99 wayland library header"
     );
 }
 
@@ -277,6 +281,7 @@ int main(int argc, char ** argv)
         {
             .output = hdr_buffered_output,
             .external_inerface_names = external_interface_names,
+            .generate_message_logs = args.generate_message_logs,
         };
 
         auto main_include = args.main_include;
@@ -343,6 +348,7 @@ int main(int argc, char ** argv)
         {
             .output = src_buffered_output,
             .external_inerface_names = external_interface_names,
+            .generate_message_logs = args.generate_message_logs,
         };
 
         // find relative path of header file with respect to source file `hdr_rel_path` to use for "#include"
