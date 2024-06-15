@@ -9,12 +9,12 @@ struct protocol_t : element_t
     std::string_view copyright_str;
     std::vector<interface_t> interfaces{};
     
-    explicit protocol_t(const pugi::xml_node node)
+    explicit protocol_t(const pugi::xml_node node, bool server_side)
         : element_t(node)
         , copyright_str{node.child("copyright").text().get()}
     {
         for (const auto interface_node : node.children("interface"))
-            interfaces.emplace_back(interface_node);
+            interfaces.emplace_back(interface_node, server_side);
     }
 
 
