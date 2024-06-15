@@ -276,8 +276,8 @@ int main(int argc, char ** argv)
         code_generation_context_t ctx
         {
             .output = hdr_buffered_output,
-            .external_inerface_names = external_interface_names,
             .generate_message_logs = args.generate_message_logs,
+            .external_inerface_names = external_interface_names,
         };
 
         auto main_include = args.main_include;
