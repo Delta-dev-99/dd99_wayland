@@ -32,16 +32,16 @@ using namespace std::string_view_literals;
 
 
 
-inline auto parse_document(const pugi::xml_document & doc)
-{
-    std::vector<protocol_t> protocols;
+// inline auto parse_document(const pugi::xml_document & doc)
+// {
+//     std::vector<protocol_t> protocols;
     
-    // NOTE: xml_node is a lightweight handle, so it's ok to copy
-    for (const auto protocol_node : doc.children("protocol"))
-        protocols.emplace_back(protocol_node);
+//     // NOTE: xml_node is a lightweight handle, so it's ok to copy
+//     for (const auto protocol_node : doc.children("protocol"))
+//         protocols.emplace_back(protocol_node);
 
-    return protocols;
-}
+//     return protocols;
+// }
 
 
 // structure used to scan command-line arguments
@@ -211,14 +211,10 @@ int main(int argc, char ** argv)
     {
         auto & doc = docs.emplace_back();
         doc.load_file(xml_file_path.data());
-
-        // this function requires a zero-terminated string
-        // using the string_view is ok because it points to some value from argv
-        auto parsed_protocols = parse_document(doc);
-
-        // join containers. TODO: there must be a better way
-        for (auto & protocol : parsed_protocols)
-            protocols.emplace_back(std::move(protocol));
+    
+        // NOTE: xml_node is a lightweight handle, so it's ok to copy
+        for (const auto protocol_node : doc.children("protocol"))
+            protocols.emplace_back(protocol_node, args.side == scan_args::side_t::SERVER);
     }
 
     std::size_t interface_count = 0; for (const auto & p : protocols) interface_count += p.interfaces.size();
@@ -285,8 +281,11 @@ int main(int argc, char ** argv)
         };
 
         auto main_include = args.main_include;
-        if (main_include.empty()) main_include = (args.side == scan_args::side_t::CLIENT)
-            ? "<dd99/wayland/interface.hpp>" : "<dd99/wayland/wayland_server.hpp>";
+        if (main_include.empty())
+        {
+            // main_include = (args.side == scan_args::side_t::CLIENT) ? "<dd99/wayland/interface.hpp>" : "<dd99/wayland/wayland_server.hpp>";
+            main_include = "<dd99/wayland/interface.hpp>";
+        }
 
         // header guard and default includes
         ctx.output.format(""
@@ -347,8 +346,8 @@ int main(int argc, char ** argv)
         code_generation_context_t ctx
         {
             .output = src_buffered_output,
-            .external_inerface_names = external_interface_names,
             .generate_message_logs = args.generate_message_logs,
+            .external_inerface_names = external_interface_names,
         };
 
         // find relative path of header file with respect to source file `hdr_rel_path` to use for "#include"
