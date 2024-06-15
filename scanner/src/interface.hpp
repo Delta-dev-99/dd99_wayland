@@ -27,22 +27,22 @@ struct interface_t : element_t
     // interface_t(const interface_t &) = delete;
     // void operator=(const interface_t &) = delete;
 
-    interface_t(const pugi::xml_node node)
+    interface_t(const pugi::xml_node node, bool server_side)
         : element_t{node}
         , version {node.attribute("version").as_int(1)}
     {
-        // parse requests
+        // parse outgoings (requests)
         int opcode = 0; // request opcodes are incremental in the order of declaration
-        for (auto request_node : node.children("request"))
+        for (auto request_node : node.children(server_side ? "event" : "request"))
         {
             msg_collection_outgoing.emplace_back(request_node, opcode++);
             if (std::string_view{node.attribute("type").value()} == "destructor")
                 destructor = {destructor.client_to_server, msg_collection_outgoing.size() - 1};
         }
 
-        // parse events
+        // parse incomings (events)
         opcode = 0;
-        for (auto event_node : node.children("event"))
+        for (auto event_node : node.children(server_side ? "request" : "event"))
             msg_collection_incoming.emplace_back(event_node, opcode++);
 
         // parse enums
@@ -143,7 +143,7 @@ struct interface_t : element_t
                         for (const auto & arg : msg.args)
                         {
                             if (!is_first_arg) ctx.output.write(", ");
-                            if (arg.base_type.type == argument_type_t::type_t::TYPE_NEWID || arg.base_type.type == argument_type_t::type_t::TYPE_OBJECT)
+                            if (arg.is_interface())
                             {
                                 ctx.output.write("object_id_t");
                             }
@@ -156,7 +156,7 @@ struct interface_t : element_t
                     // lookup object ids
                     for (const auto & arg : msg.args)
                     {
-                        if (arg.base_type.type == argument_type_t::type_t::TYPE_OBJECT)
+                        if (arg.is_existent_interface())
                         {
                             ctx.output.format(""
                                 "{}auto "
@@ -185,7 +185,7 @@ struct interface_t : element_t
                         {
                             if (!is_first_arg) ctx.output.write(", ");
                             arg.print_name(ctx);
-                            if (arg.base_type.type == argument_type_t::type_t::TYPE_OBJECT) ctx.output.write("ptr");
+                            if (arg.is_existent_interface()) ctx.output.write("ptr");
                             is_first_arg = false;
                         }
                     }
