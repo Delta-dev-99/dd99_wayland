@@ -238,8 +238,11 @@ struct code_generation_context_t
     fd_buffered_output & output;
     int indent_size = 4; // TODO: add related option
     int indent_level = 0;
+    
+    bool generate_message_logs;
+
     const std::set<std::string_view> & external_inerface_names;
+
     std::string_view current_protocol{};
     std::string_view current_interface{};
-    bool generate_message_logs;
 };
