@@ -35,3 +35,6 @@ target_link_libraries(${current_target} PRIVATE dd99::wayland asio::asio)
 # set_target_warnings(${current_target} PRIVATE)
 dd99_add_wayland_client_protocol(${current_target} PROTOCOL /usr/share/wayland/wayland.xml BASENAME wayland)
 dd99_add_wayland_client_protocol(${current_target} PROTOCOL /usr/share/wayland-protocols/stable/xdg-shell/xdg-shell.xml BASENAME xdg-shell)
+
+
+add_subdirectory(server_test1)
