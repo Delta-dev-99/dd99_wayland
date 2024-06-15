@@ -24,10 +24,21 @@ struct message_t : element_t
     {
         for (const auto arg_node : node.children("arg"))
         {
-            // auto & i = 
+            argument_t new_arg{arg_node};
+
+            // new_id is prefixed with interface name and version when not specified
+            if (new_arg.is_unspecified_new_interface())
+            {
+                args.emplace_back(
+                    element_t{new_arg.name + "_interface"},
+                    argument_type_t::T_STRING);
+
+                args.emplace_back(
+                    element_t{new_arg.name + "_version"},
+                    argument_type_t::T_UINT);
+            }
+
             args.emplace_back(arg_node);
-            // if (i.base_type.type == argument_type_t::type_t::TYPE_NEWID)
-            //     ret_index = args.size() - 1;
         }
     }
 
@@ -67,21 +78,21 @@ struct message_t : element_t
 
         for (const auto & arg : args)
         {
-            const bool is_new = arg.base_type == argument_type_t::TYPE_NEWID;
-            const bool is_interface = arg.base_type == argument_type_t::TYPE_OBJECT;
-            const bool is_string = arg.base_type == argument_type_t::TYPE_STRING;
-            const bool is_int = arg.base_type == argument_type_t::TYPE_INT || arg.base_type == argument_type_t::TYPE_UINT;
+            // const bool is_new = arg.base_type == argument_type_t::T_NEWID;
+            // const bool is_interface = arg.base_type == argument_type_t::T_OBJECT;
+            // const bool is_string = arg.base_type == argument_type_t::T_STRING;
+            // const bool is_int = arg.base_type == argument_type_t::T_INT || arg.base_type == argument_type_t::T_UINT;
 
-            // new-id is prefixed by interface name string and version when not explicit by protocol
-            if (is_new && arg.interface.empty())
-            {
-                ctx.output.format(""
-                    "{0}, std::format(\"{1}_interface: '{{}}'\", {1}_interface.sv())\n"
-                    "{0}, std::format(\"{1}_version: '{{}}'\", {1}_version)\n"
-                , whitespace{ctx.indent_size * (ctx.indent_level + 1)}
-                , arg.name
-                );
-            }
+            // // new-id is prefixed by interface name string and version when not explicit by protocol
+            // if (is_new && arg.interface.empty())
+            // {
+            //     ctx.output.format(""
+            //         "{0}, std::format(\"{1}_interface: '{{}}'\", {1}_interface.sv())\n"
+            //         "{0}, std::format(\"{1}_version: '{{}}'\", {1}_version)\n"
+            //     , whitespace{ctx.indent_size * (ctx.indent_level + 1)}
+            //     , arg.name
+            //     );
+            // }
 
             ctx.output.format(""
                 "{}, std::format(\"{}: "
@@ -89,32 +100,32 @@ struct message_t : element_t
             , format::argument_name_cpp{ctx, arg}
             );
 
-            if (is_new) ctx.output.write("new ");
+            if (arg.is_new_interface()) ctx.output.write("new ");
             // if (is_string) ctx.output.write("string");
-            if (arg.base_type == argument_type_t::TYPE_FD)
+            if (arg.is_fd())
                 ctx.output.write("[FILE] ");
-            if (arg.base_type == argument_type_t::TYPE_ARRAY)
+            if (arg.is_array())
                 ctx.output.write("array ");
-            else if (!is_string && !is_int)
+            else if (!arg.can_ommit_type_in_log())
                 ctx.output.format("{} ", format::argument_type_cpp{ctx, arg});
 
-            if (is_interface || is_new) ctx.output.put('@');
-            if (is_string) ctx.output.write("'{}'\", ");
+            if (arg.is_interface()) ctx.output.put('@');
+            if (arg.is_string()) ctx.output.write("'{}'\", ");
             else ctx.output.write("{}\", ");
 
-            if (is_interface)
+            if (arg.is_existent_interface())
             {
                 ctx.output.write("reinterpret_cast<interface *>(");
                 print_argument_name(ctx, arg);
                 ctx.output.write(")->get_id()");
             }
-            else if (!arg.enum_name.empty())
+            else if (arg.is_enum())
             {
                 ctx.output.write("static_cast<std::uint32_t>(");
                 print_argument_name(ctx, arg);
                 ctx.output.write(")");
             }
-            else if (arg.base_type == argument_type_t::TYPE_STRING)
+            else if (arg.is_string())
             {
                 print_argument_name(ctx, arg);
                 ctx.output.write(".sv()");
@@ -145,7 +156,7 @@ struct message_t : element_t
             ctx.output.write(", ");
             arg.print_type(ctx);
             ctx.output.put(' ');
-            if (arg.base_type.type == argument_type_t::type_t::TYPE_OBJECT || arg.base_type.type == argument_type_t::type_t::TYPE_NEWID)
+            if (arg.is_interface())
                 ctx.output.write("& ");
             print_argument_name(ctx, arg);
             // arg.print_name(ctx);
@@ -187,7 +198,7 @@ struct message_t : element_t
         // interface name assertion for undefined new ids
         for (const auto & arg : args)
         {
-            if (arg.base_type == argument_type_t::TYPE_NEWID && arg.interface.empty())
+            if (arg.is_unspecified_new_interface())
             {
                 ctx.output.format(""
                     "{0}assert({1}_interface == {1}.get_interface_name());\n"
@@ -201,7 +212,7 @@ struct message_t : element_t
         // count fds
         int fds_count = 0;
         for (const auto & arg : args) {
-            if (arg.base_type == argument_type_t::TYPE_FD) {
+            if (arg.is_fd()) {
                 fds_count++;
             }
         }
@@ -218,7 +229,7 @@ struct message_t : element_t
                 bool is_first_arg = true;
                 for (const auto & arg : args)
                 {
-                    if (arg.base_type != argument_type_t::TYPE_FD) continue;
+                    if (!arg.is_fd()) continue;
 
                     ctx.output.format("{}{}"
                     , is_first_arg ? "" : ", "
@@ -233,7 +244,7 @@ struct message_t : element_t
         // bind interfaces to new object_ids
         for (const auto & arg : args)
         {
-            if (arg.base_type != argument_type_t::TYPE_NEWID) continue;
+            if (!arg.is_new_interface()) continue;
 
             if (arg.interface.empty())
             {
@@ -261,18 +272,18 @@ struct message_t : element_t
         for (const auto & arg : args)
         {
             // file descriptors are not passed as arguments here
-            if (arg.base_type == argument_type_t::TYPE_FD) continue;
+            if (arg.is_fd()) continue;
 
             ctx.output.write(", ");
 
             // new-id is prefixed by interface name string and version when not explicit by protocol
-            if (arg.base_type == argument_type_t::TYPE_NEWID && arg.interface.empty())
-            {
-                ctx.output.format("{0}_interface, {0}_version, "
-                , format::argument_name_cpp{ctx, arg});
-            }
+            // if (arg.base_type == argument_type_t::T_NEWID && arg.interface.empty())
+            // {
+            //     ctx.output.format("{0}_interface, {0}_version, "
+            //     , format::argument_name_cpp{ctx, arg});
+            // }
 
-            if (arg.base_type == argument_type_t::TYPE_NEWID) ctx.output.write("new_");
+            if (arg.is_new_interface()) ctx.output.write("new_");
             ctx.output.format("{}", format::argument_name_cpp{ctx, arg});
         }
         // end of `send_wayland_message` invocation
@@ -289,21 +300,21 @@ struct message_t : element_t
             // log message arguments
             for (const auto & arg : args)
             {
-                const bool is_new = arg.base_type == argument_type_t::TYPE_NEWID;
-                const bool is_interface = is_new || arg.base_type == argument_type_t::TYPE_OBJECT;
-                const bool is_string = arg.base_type == argument_type_t::TYPE_STRING;
-                const bool is_int = arg.base_type == argument_type_t::TYPE_INT || arg.base_type == argument_type_t::TYPE_UINT;
+                // const bool is_new = arg.base_type == argument_type_t::T_NEWID;
+                // const bool is_interface = is_new || arg.base_type == argument_type_t::T_OBJECT;
+                // const bool is_string = arg.base_type == argument_type_t::T_STRING;
+                // const bool is_int = arg.base_type == argument_type_t::T_INT || arg.base_type == argument_type_t::T_UINT;
 
                 // new-id is prefixed by interface name string and version when not explicit by protocol
-                if (is_new && arg.interface.empty())
-                {
-                    ctx.output.format(""
-                        "{0}, std::format(\"{1}_interface: '{{}}'\", {1}_interface.sv())\n"
-                        "{0}, std::format(\"{1}_version: '{{}}'\", {1}_version)\n"
-                    , whitespace{ctx.indent_size * (ctx.indent_level + 1)}
-                    , arg.name
-                    );
-                }
+                // if (is_new && arg.interface.empty())
+                // {
+                //     ctx.output.format(""
+                //         "{0}, std::format(\"{1}_interface: '{{}}'\", {1}_interface.sv())\n"
+                //         "{0}, std::format(\"{1}_version: '{{}}'\", {1}_version)\n"
+                //     , whitespace{ctx.indent_size * (ctx.indent_level + 1)}
+                //     , arg.name
+                //     );
+                // }
 
                 ctx.output.format(""
                     "{}, std::format(\""
@@ -313,35 +324,35 @@ struct message_t : element_t
                 print_argument_name(ctx, arg);
                 ctx.output.write(": ");
 
-                if (is_new) ctx.output.write("new ");
+                if (arg.is_new_interface()) ctx.output.write("new ");
                 // if (is_string) ctx.output.write("string");
-                if (arg.base_type == argument_type_t::TYPE_FD)
+                if (arg.is_fd())
                 {
                     ctx.output.write("[FILE] ");
                 }
-                else if (!is_string && !is_int)
+                else if (!arg.can_ommit_type_in_log())
                 {
                     arg.print_type(ctx);
                     ctx.output.put(' ');
                 }
 
-                if (is_interface) ctx.output.put('@');
-                if (is_string) ctx.output.write("'{}'\", ");
+                if (arg.is_interface()) ctx.output.put('@');
+                if (arg.is_string()) ctx.output.write("'{}'\", ");
                 else ctx.output.write("{}\", ");
 
-                if (is_interface)
+                if (arg.is_interface())
                 {
                     ctx.output.write("reinterpret_cast<interface &>(");
                     print_argument_name(ctx, arg);
                     ctx.output.write(").get_id()");
                 }
-                else if (!arg.enum_name.empty())
+                else if (arg.is_enum())
                 {
                     ctx.output.write("static_cast<std::uint32_t>(");
                     print_argument_name(ctx, arg);
                     ctx.output.write(")");
                 }
-                else if (arg.base_type == argument_type_t::TYPE_STRING)
+                else if (arg.is_string())
                 {
                     print_argument_name(ctx, arg);
                     ctx.output.write(".sv()");
@@ -395,16 +406,37 @@ private:
         for (const auto & arg : args)
         {
             if (!first_arg) ctx.output.write(", ");
-            first_arg = false;
-            if (arg.base_type.type == argument_type_t::type_t::TYPE_NEWID)
+
+            // new-id is prefixed by interface name string and version when not explicit by protocol
+            // if (arg.is_unspecified_new_interface())
+            // {
+            //     ctx.output.format(""
+            //         "{0} {1}_interface, std::uint32_t {1}_version, "
+            //     , argument_type_t::protocol_basic_type_to_cpp_type_string(argument_type_t::T_STRING)
+            //     , format::argument_name_cpp{ctx, arg}
+            //     );
+
+            //     // ctx.output.write(argument_type_t::protocol_basic_type_to_cpp_type_string(argument_type_t::TYPE_STRING));
+            //     // ctx.output.put(' ');
+            //     // print_argument_name(ctx, argument);
+            //     // argument.print_name(ctx);
+            //     // ctx.output.write("_interface, std::uint32_t ");
+            //     // print_argument_name(ctx, argument);
+            //     // argument.print_name(ctx);
+            //     // ctx.output.write("_version, ");
+            // }
+
+            if (arg.is_new_interface())
                 ctx.output.write("object_id_t ");
             else
             {
                 ctx.output.format("{} {}"
                 , format::argument_type_cpp{ctx, arg}
-                , arg.base_type == argument_type_t::TYPE_OBJECT ? "* " : "");
+                , arg.is_existent_interface() ? "* " : "");
             }
             ctx.output.format("{}", format::argument_name_cpp{ctx, arg});
+            
+            first_arg = false;
         }
         ctx.output.write(")");
     }
@@ -433,25 +465,26 @@ private:
             if (!is_first_arg) ctx.output.write(", ");
 
             // new-id is prefixed by interface name string and version when not explicit by protocol
-            if (argument.base_type == argument_type_t::TYPE_NEWID && argument.interface.empty())
-            {
-                ctx.output.format(""
-                    "{0} {1}_interface, std::uint32_t {1}_version, "
-                , argument_type_t::protocol_basic_type_to_cpp_type_string(argument_type_t::TYPE_STRING)
-                , format::argument_name_cpp{ctx, argument}
-                );
+            // if (argument.base_type == argument_type_t::T_NEWID && argument.interface.empty())
+            // {
+            //     ctx.output.format(""
+            //         "{0} {1}_interface, std::uint32_t {1}_version, "
+            //     , argument_type_t::protocol_basic_type_to_cpp_type_string(argument_type_t::T_STRING)
+            //     , format::argument_name_cpp{ctx, argument}
+            //     );
 
-                // ctx.output.write(argument_type_t::protocol_basic_type_to_cpp_type_string(argument_type_t::TYPE_STRING));
-                // ctx.output.put(' ');
-                // print_argument_name(ctx, argument);
-                // argument.print_name(ctx);
-                // ctx.output.write("_interface, std::uint32_t ");
-                // print_argument_name(ctx, argument);
-                // argument.print_name(ctx);
-                // ctx.output.write("_version, ");
-            }
+            //     // ctx.output.write(argument_type_t::protocol_basic_type_to_cpp_type_string(argument_type_t::TYPE_STRING));
+            //     // ctx.output.put(' ');
+            //     // print_argument_name(ctx, argument);
+            //     // argument.print_name(ctx);
+            //     // ctx.output.write("_interface, std::uint32_t ");
+            //     // print_argument_name(ctx, argument);
+            //     // argument.print_name(ctx);
+            //     // ctx.output.write("_version, ");
+            // }
 
-            bool is_ref = !argument.interface.empty() || argument.base_type.type == argument_type_t::type_t::TYPE_NEWID;
+            // TODO: review this!
+            bool is_ref = !argument.interface.empty() || argument.type() == argument_type_t::T_NEWID;
 
             ctx.output.format(""
                 "{}{} {}"
