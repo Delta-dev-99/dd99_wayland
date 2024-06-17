@@ -63,7 +63,7 @@ struct interface_t : element_t
 
     void print_src(code_generation_context_t & ctx) const
     {
-        ctx.current_interface = name;
+        ctx.current_interface_ptr = this;
 
         ctx.output.format(""
             "\n\n"
@@ -81,22 +81,22 @@ struct interface_t : element_t
         {
             ctx.output.format(""
                 "\n"
-                "{0}void {4}::parse_and_dispatch_event(std::span<const char> buffer)\n"
+                "{0}void {4}::parse_and_dispatch_event(std::span<const char> buf)\n"
                 "{0}{{\n"
                 "{1}object_id_t obj_id;\n"
                 "{1}message_size_t msg_size;\n"
                 "{1}opcode_t code;\n"
                 "{1}\n"
-                "{1}assert(buffer.size() >= 8); // header size\n"
+                "{1}assert(buf.size() >= 8); // header size\n"
                 "{1}\n"
-                "{1}auto data_words = reinterpret_cast<const std::uint32_t *>(buffer.data());\n"
+                "{1}auto data_words = reinterpret_cast<const std::uint32_t *>(buf.data());\n"
                 "{1}obj_id = data_words[0];\n"
                 "{1}msg_size = data_words[1] >> 16;\n"
                 "{1}code = data_words[1] & ((1 << 16) - 1);\n"
                 "{1}\n"
                 "{1}assert(obj_id == m_object_id);\n"
                 "{1}\n"
-                "{1}buffer = buffer.subspan(8); // skip header\n"
+                "{1}buf = buf.subspan(8); // skip header\n"
                 "{1}\n"
                 "{1}switch(code){{\n"
                 // "{0}}}\n"
@@ -151,7 +151,7 @@ struct interface_t : element_t
                             is_first_arg = false;
                         }
                     }
-                    ctx.output.write(">(buffer);\n");
+                    ctx.output.write(">(buf);\n");
                     
                     // lookup object ids
                     for (const auto & arg : msg.args)
@@ -221,7 +221,7 @@ struct interface_t : element_t
             , name);
         }
 
-        ctx.current_interface = {};
+        ctx.current_interface_ptr = {};
     }
 
     void print_fw_declaration(code_generation_context_t & ctx) const
@@ -231,7 +231,7 @@ struct interface_t : element_t
 
     void print_definition(code_generation_context_t & ctx) const
     {
-        ctx.current_interface = name;
+        ctx.current_interface_ptr = this;
 
         ctx.output.write("\n\n");
         if (!summary.empty())       ctx.output.format("{}// INTERFACE {}\n", whitespace{ctx.indent_size * ctx.indent_level}, original_name);
@@ -363,12 +363,12 @@ struct interface_t : element_t
         // end struct scope
         ctx.output.format("{}}};// {}\n", whitespace{ctx.indent_size * ctx.indent_level}, name);
 
-        ctx.current_interface = {};
+        ctx.current_interface_ptr = {};
     }
 
     void print_member_definitions_section(code_generation_context_t & ctx) const
     {
-        ctx.current_interface = name;
+        ctx.current_interface_ptr = this;
 
         ctx.output.format(""
             "{0}// {1:*>{2}}\n"
@@ -412,6 +412,6 @@ struct interface_t : element_t
         // for (const auto & event : server_to_client_msg_collection)
         //     event.print_definition_r(ctx);
 
-        ctx.current_interface = {};
+        ctx.current_interface_ptr = {};
     }
 };

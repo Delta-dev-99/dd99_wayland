@@ -3,7 +3,7 @@
 #include <string_view>
 
 
-namespace dd99::wayland
+namespace dd99::wayland::proto
 {
     
     // a string_view that's guaranteed to be zero-terminated or empty

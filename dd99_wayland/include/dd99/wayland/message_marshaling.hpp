@@ -22,7 +22,7 @@ namespace dd99::wayland::detail
         // string_view not allowed any more
         static_assert(!std::same_as<std::remove_cvref_t<T>, std::string_view>);
 
-        if constexpr (std::same_as<std::remove_cvref_t<T>, zview>)
+        if constexpr (std::same_as<std::remove_cvref_t<T>, proto::zview>)
         {
             auto str_size = v.size() + 1; // account for the null terminator
             // 32-bit size, then the payload, padded to 32-bit alignment
@@ -45,10 +45,10 @@ namespace dd99::wayland::detail
     template <class T>
     inline constexpr void message_marshal_one(engine & eng, std::span<int> fds, const T & v)
     {
-        constexpr zview zeroes = "\0\0";
+        constexpr proto::zview zeroes = "\0\0";
         // TODO: array
 
-        if constexpr (std::same_as<std::remove_cvref_t<T>, zview>)
+        if constexpr (std::same_as<std::remove_cvref_t<T>, proto::zview>)
         {
             auto wire_size = _marshal_size_one(v);
             auto str_size = static_cast<std::uint32_t>(v.size()) + 1; // account for the null terminator

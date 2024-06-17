@@ -191,7 +191,7 @@ struct registry final : pw::registry
     { }
 
 protected:
-    void on_global(std::uint32_t name, dd99::wayland::zview interface, std::uint32_t version) override
+    void on_global(std::uint32_t name, dd99::wayland::proto::zview interface, std::uint32_t version) override
     {
         pw::registry::on_global(name, interface, version);
 

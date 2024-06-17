@@ -3,6 +3,7 @@
 #include "argument.hpp"
 #include "element.hpp"
 #include "formatting.hpp"
+#include <cassert>
 #include <unistd.h>
 
 
@@ -70,7 +71,7 @@ struct message_t : element_t
             "{}dbg::log_message(\"{}\", \"{}\", dbg::direction::incoming, m_object_id\n"
         , whitespace{ctx.indent_size * ctx.indent_level}
         , whitespace{ctx.indent_size * (ctx.indent_level + 1)}
-        , ctx.current_interface
+        , reinterpret_cast<const element_t *>(ctx.current_interface_ptr)->name
         , name
         );
 
@@ -196,16 +197,29 @@ struct message_t : element_t
         ctx.indent_level++;
 
         // interface name assertion for undefined new ids
-        for (const auto & arg : args)
+        for (std::size_t i = 0; i < args.size(); ++i)
         {
-            if (arg.is_unspecified_new_interface())
+            if (args[i].is_unspecified_new_interface())
             {
+                assert(i >= 2);
+                
                 ctx.output.format(""
-                    "{0}assert({1}_interface == {1}.get_interface_name());\n"
+                    "{0}assert({1} == {2}.get_interface_name());\n"
                 , whitespace{ctx.indent_size * ctx.indent_level}
-                , format::argument_name_cpp{ctx, arg});
+                , format::argument_name_cpp{ctx, args[i-2]}
+                , format::argument_name_cpp{ctx, args[i]});
             }
         }
+        // for (const auto & arg : args)
+        // {
+        //     if (arg.is_unspecified_new_interface())
+        //     {
+        //         ctx.output.format(""
+        //             "{0}assert({1}_interface == {1}.get_interface_name());\n"
+        //         , whitespace{ctx.indent_size * ctx.indent_level}
+        //         , format::argument_name_cpp{ctx, arg});
+        //     }
+        // }
 
         ctx.output.put('\n');
 
@@ -242,16 +256,17 @@ struct message_t : element_t
         }
 
         // bind interfaces to new object_ids
-        for (const auto & arg : args)
+        for (std::size_t i = 0; i < args.size(); ++i)
         {
-            if (!arg.is_new_interface()) continue;
+            if (!args[i].is_new_interface()) continue;
 
-            if (arg.interface.empty())
+            if (args[i].interface.empty())
             {
                 ctx.output.format(""
-                    "{0}auto new_{1} = m_engine.bind_interface({1}, {1}_version);\n"
+                    "{0}auto new_{1} = m_engine.bind_interface({1}, {2});\n"
                 , whitespace{ctx.indent_size * ctx.indent_level}
-                , format::argument_name_cpp{ctx, arg}
+                , format::argument_name_cpp{ctx, args[i]}
+                , format::argument_name_cpp{ctx, args[i-1]}
                 );
             }
             else
@@ -259,10 +274,31 @@ struct message_t : element_t
                 ctx.output.format(""
                     "{0}auto new_{1} = m_engine.bind_interface({1}, m_version);\n"
                 , whitespace{ctx.indent_size * ctx.indent_level}
-                , format::argument_name_cpp{ctx, arg}
+                , format::argument_name_cpp{ctx, args[i]}
                 );
             }
         }
+        // for (const auto & arg : args)
+        // {
+        //     if (!arg.is_new_interface()) continue;
+
+        //     if (arg.interface.empty())
+        //     {
+        //         ctx.output.format(""
+        //             "{0}auto new_{1} = m_engine.bind_interface({1}, {1}_version);\n"
+        //         , whitespace{ctx.indent_size * ctx.indent_level}
+        //         , format::argument_name_cpp{ctx, arg}
+        //         );
+        //     }
+        //     else
+        //     {
+        //         ctx.output.format(""
+        //             "{0}auto new_{1} = m_engine.bind_interface({1}, m_version);\n"
+        //         , whitespace{ctx.indent_size * ctx.indent_level}
+        //         , format::argument_name_cpp{ctx, arg}
+        //         );
+        //     }
+        // }
         
         ctx.output.format("{}", whitespace{ctx.indent_size * ctx.indent_level});
         ctx.output.write("send_wayland_message(opcode, ");
@@ -295,7 +331,7 @@ struct message_t : element_t
             ctx.output.format("\n"
                 "{}dbg::log_message(\"{}\", \"{}\", dbg::direction::outgoing, m_object_id\n"
             , whitespace{ctx.indent_size * ctx.indent_level}
-            , ctx.current_interface
+            , reinterpret_cast<const element_t *>(ctx.current_interface_ptr)->name
             , name);
             // log message arguments
             for (const auto & arg : args)
@@ -396,7 +432,7 @@ private:
             "{}{} void {}{}on_{}("
         , whitespace{ctx.indent_level * ctx.indent_size}
         , outside_class ? "inline" : "virtual"
-        , outside_class ? ctx.current_interface : ""
+        , outside_class ? reinterpret_cast<const element_t *>(ctx.current_interface_ptr)->name : ""
         , outside_class ? "::" : ""
         , name
         );
@@ -454,7 +490,7 @@ private:
         ctx.output.write("void ");
 
         // function name
-        if (outside_class) ctx.output.format("{}::", ctx.current_interface);
+        if (outside_class) ctx.output.format("{}::", reinterpret_cast<const element_t *>(ctx.current_interface_ptr)->name);
         ctx.output.write(name);
         ctx.output.put('(');
 
@@ -484,12 +520,12 @@ private:
             // }
 
             // TODO: review this!
-            bool is_ref = !argument.interface.empty() || argument.type() == argument_type_t::T_NEWID;
+            // bool is_ref = !argument.interface.empty() || argument.type() == argument_type_t::T_NEWID;
 
             ctx.output.format(""
                 "{}{} {}"
             , format::argument_type_cpp{ctx, argument}
-            , is_ref ? " &" : ""
+            , argument.is_interface() ? " &" : ""
             , format::argument_name_cpp{ctx, argument}
             );
             // argument.print_type(ctx);

@@ -20,7 +20,7 @@ struct protocol_t : element_t
 
     void print_hdr(code_generation_context_t & ctx) const
     {
-        ctx.current_protocol = name;
+        ctx.current_protocol_ptr = this;
 
         print_namespace_begin(ctx);
         ctx.indent_level++;
@@ -58,12 +58,12 @@ struct protocol_t : element_t
         ctx.indent_level--;
         print_namespace_end(ctx);
 
-        ctx.current_protocol = {};
+        ctx.current_protocol_ptr = {};
     }
 
     void print_src(code_generation_context_t & ctx) const
     {
-        ctx.current_protocol = name;
+        ctx.current_protocol_ptr = this;
 
         print_namespace_begin(ctx);
         ctx.indent_level++;
@@ -73,7 +73,7 @@ struct protocol_t : element_t
         ctx.indent_level--;
         print_namespace_end(ctx);
 
-        ctx.current_protocol = {};
+        ctx.current_protocol_ptr = {};
     }
 
 private:

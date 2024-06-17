@@ -13,6 +13,7 @@
 #include <format>
 #include <utility>
 #include <vector>
+#include <map>
 
 
 // used to create a formatted string and write to fd
@@ -231,6 +232,10 @@ private:
 };
 
 
+// fw_declaration
+struct protocol_t;
+struct interface_t;
+
 
 // data used for code generation
 struct code_generation_context_t
@@ -242,7 +247,14 @@ struct code_generation_context_t
     bool generate_message_logs;
 
     const std::set<std::string_view> & external_inerface_names;
+    const std::vector<protocol_t> & protocols;
 
-    std::string_view current_protocol{};
-    std::string_view current_interface{};
+    const protocol_t * current_protocol_ptr{};
+    const interface_t * current_interface_ptr{};
+
+    // map (protocol name) -> {map (interface name) -> {set (defined names)}}
+    std::map<std::string_view, std::map<std::string_view, std::set<std::string_view>>> & name_index;
+
+    // std::string_view current_protocol{};
+    // std::string_view current_interface{};
 };

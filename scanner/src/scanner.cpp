@@ -20,7 +20,9 @@
 #include <iterator>
 #include <set>
 #include <string_view>
+#include <tuple>
 #include <unistd.h>
+#include <utility>
 
 #include "formatting.hpp"
 #include "protocol.hpp"
@@ -206,6 +208,10 @@ int main(int argc, char ** argv)
     std::vector<pugi::xml_document> docs; // these own the memory most string_views point to
     std::vector<protocol_t> protocols;
 
+    // map (protocol name) -> {map (interface name) -> {set (defined names)}}
+    std::map<std::string_view, std::map<std::string_view, std::set<std::string_view>>> name_index;
+
+
     // parse each input xml file and append all parsed protocols to the collection
     for (const auto xml_file_path : args.xml_file_paths)
     {
@@ -214,7 +220,20 @@ int main(int argc, char ** argv)
     
         // NOTE: xml_node is a lightweight handle, so it's ok to copy
         for (const auto protocol_node : doc.children("protocol"))
-            protocols.emplace_back(protocol_node, args.side == scan_args::side_t::SERVER);
+        {
+            // parse protocols, interfaces, messages, etc
+            auto & protocol = protocols.emplace_back(protocol_node, args.side == scan_args::side_t::SERVER);
+
+            // index names to avoid name collisions (xml specification contains quite a few)
+            auto [it, b] = name_index.emplace(std::piecewise_construct, std::make_tuple(std::string_view{protocol.name}), std::make_tuple()); // index protocol name
+            for (const auto & interface : protocol.interfaces)
+            {
+                auto [it2, b2] = it->second.emplace(std::piecewise_construct, std::make_tuple(std::string_view{interface.name}), std::make_tuple()); // index interface name
+
+                // index function names inside interface
+                for (const auto & msg : interface.msg_collection_outgoing) it2->second.emplace(msg.name);
+            }
+        }
     }
 
     std::size_t interface_count = 0; for (const auto & p : protocols) interface_count += p.interfaces.size();
@@ -278,6 +297,8 @@ int main(int argc, char ** argv)
             .output = hdr_buffered_output,
             .generate_message_logs = args.generate_message_logs,
             .external_inerface_names = external_interface_names,
+            .protocols = protocols,
+            .name_index = name_index,
         };
 
         auto main_include = args.main_include;
@@ -348,6 +369,8 @@ int main(int argc, char ** argv)
             .output = src_buffered_output,
             .generate_message_logs = args.generate_message_logs,
             .external_inerface_names = external_interface_names,
+            .protocols = protocols,
+            .name_index = name_index,
         };
 
         // find relative path of header file with respect to source file `hdr_rel_path` to use for "#include"
